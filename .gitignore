@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Node
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode/bun.lock
+
+# OpenCode inner config (self-managed, not needed in repo)
+.opencode/.gitignore
