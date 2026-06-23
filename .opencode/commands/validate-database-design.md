@@ -6,7 +6,9 @@ Review and validate the conceptual and logical database designs against the busi
 
 ## Agent
 
-database-design-reviewer
+Before producing the output:
+1. Read and follow the agent definition from:
+   `.opencode/agent/database-design-reviewer.md`
 
 ## Aliases
 

@@ -4,7 +4,9 @@
 
 ## Agent
 
-logical-database-designer
+Before producing the output:
+1. Read and follow the agent definition from:
+   `.opencode/agent/logical-database-designer.md`
 
 ## Aliases
 

@@ -4,7 +4,9 @@
 
 ## Agent
 
-conceptual-database-designer
+Before producing the output:
+1. Read and follow the agent definition from:
+   `.opencode/agent/conceptual-database-designer.md`
 
 ## Aliases
 

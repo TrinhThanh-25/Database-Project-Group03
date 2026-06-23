@@ -6,7 +6,9 @@ Analyze business requirements and produce a Business Requirement Analysis docume
 
 ## Agent
 
-business-analyst
+Before producing the output:
+1. Read and follow the agent definition from:
+   `.opencode/agent/business-analyst.md`
 
 ## Aliases
 
