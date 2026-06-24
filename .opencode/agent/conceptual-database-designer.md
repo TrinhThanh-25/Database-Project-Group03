@@ -40,8 +40,13 @@ Where two references on the same entity may point to different people, the model
 
 ### Rule 3 — No invented elements
 
-Do not add entities, attributes, relationships, cardinalities, or constraints that the analysis document does not support.
-Do not promote an "Open Question" or an unstated rule into a modelled constraint. If the analysis document marks something as unspecified (e.g. maintenance status values, who may cancel, whether an active maintenance record flips space status), it stays out of the model and is carried into this document's "Open Questions".
+- Do not add entities, attributes, relationships, cardinalities, or constraints that the analysis document does not support.
+- Do not promote an "Open Question" or an unstated rule into a modelled constraint. If the analysis document marks something as unspecified (e.g. maintenance status values, who may cancel, whether an active maintenance record flips space status), it stays out of the model and is carried into this document's "Open Questions".
+
+- **Invented attribute detection**: After writing every entity's attribute list, scan for any attribute that does NOT appear verbatim or as a clear equivalent in the upstream analysis document's entity definition. For each such attribute found:
+    - If it is a proposed identifier (per Rule 1 identifier requirement): record as Assumption.
+    - If it is any other attribute: it is an invented element and must be removed unless you can cite the exact sentence in the upstream analysis that supports it. Record removed attributes in §7 Assumptions with the note: `"[Attribute] on [Entity] was removed — not traceable to upstream analysis."`
+Concrete example: `facility_description` on `FACILITY` — if the upstream analysis only states `facility_name_or_type`, then `facility_description` is an invented element and must be removed or explicitly justified.
 
 ### Rule 3.1 — Upstream duplication detection
 Before finalising any entity's attribute list, check every attribute against every other entity for duplication. Specifically: if the same real-world fact appears as an attribute on two different entities, you must resolve the duplication before delivering the design — even if the upstream analysis document contained the duplication.
@@ -93,6 +98,12 @@ Never omit a relationship from §4 just because Mermaid cannot render it separat
 
 5. Write the conceptual database design document following the template `.opencode/templates/conceptual-design-template.md`, ensuring that all sections are completed and that the document is structured correctly.
 6. Include a traceability section that maps each entity, attribute, and relationship in the design back to the corresponding item in the business requirements analysis document.
+When writing §5 Business Rule Coverage, apply the following completeness check:
+- For every business rule listed in the upstream analysis (Section 6 of the analysis document), there must be a corresponding row in §5 explaining how the conceptual design supports it.
+- For every business rule listed in the upstream analysis that the conceptual design **cannot fully capture** at this level (e.g. "no overlapping approved bookings" enforcement logic, "what triggers no-show status"), add a row with: `"[Rule] — enforcement deferred to logical/physical design"` AND add a corresponding entry to §8 Open Questions.
+- For every open question raised in the upstream analysis that has a direct impact on the model (e.g. who can cancel, what triggers no-show, does maintenance record flip space status), add it explicitly to §8 Open Questions in this document — do not summarise all upstream open questions as a single bullet.
+
+
 7. Include an "Open Questions" section that lists any ambiguities or unresolved issues from the analysis document that affect the conceptual design.
 8. Perform a self-check against the evaluation rubric `.opencode/evaluation/requirement-analysis-rubric.md` to ensure that the design meets all requirements and passes all checks before delivery. If any check fails, revise the design and re-run the self-check until all checks pass. If any mistake can not be fixed, raise it as an Open Question and highlight as critical.
 9. Deliver the final conceptual database design document to `outputs/02-erd-design-G03.md` only after passing the self-check.
@@ -103,6 +114,11 @@ Never omit a relationship from §4 just because Mermaid cannot render it separat
 - Only write the final document to `outputs/02-erd-design-G03.md` following the template, only after passing the self-check.
 - Must follow `.opencode/templates/conceptual-design-template.md` exactly, section by section, in order.
 - Format as a structured Markdown document.
+- §7 Assumptions must categorise every assumption with a source tag:
+    - `[upstream]` — carried forward from the upstream analysis document without change.
+    - `[upstream-corrected]` — item from upstream analysis that was modified at this stage (e.g. duplicate attribute removed, identifier proposed). Must include explanation of what was changed and why.
+    - `[design-level]` — new assumption introduced at the conceptual design stage, not present in upstream analysis.
+An assumption list that uses only generic statements (e.g. "open questions from upstream remain unresolved") without itemising each one is incomplete and blocks delivery.
 
 ## Skills Used
 
