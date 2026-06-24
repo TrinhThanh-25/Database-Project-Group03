@@ -40,6 +40,9 @@ For every entity that participates in a relationship, its OWN attribute list (Se
 
 Before finalizing Section 4, re-read each entity's attribute list and ask: "If I only had this list and no relationship table, could I tell who/what this record points to?" If no, add the missing attribute.
 
+Primary key requirement: Every entity's attribute list must also include a primary key attribute. If the source text names one explicit (e.g., "user ID", "unique space code"), use it. If the source text does not name one, propose a surrogate key (e.g., "Booking ID", "Maintenance Record ID"), mark it with [proposed identifier — not stated in source], and record it as an Assumption. An entity with no identifier listed is incomplete and must not be delivered.
+
+
 ### Rule 3 — Single source of truth per fact
 
 Each discrete fact must live on exactly one entity. Before adding an attribute, check whether that fact is already captured elsewhere:
@@ -65,7 +68,11 @@ Before finalizing the Actors section, check every actor against every other acto
 
 For entities or relationships that represent multi-step processes (bookings, maintenance), the analysis must also capture, in the dedicated template sections (not invented inline in Business Rules):
 
-- **State transitions**: the allowed status values and which statuses can move to which other statuses, grounded in the source's described sequence (e.g., pending → approved/rejected; approved → checked in; checked in → completed or no-show; pending/approved → cancelled). Only state transitions clearly implied by the source's described workflow should be listed as definite; anything not clearly implied goes to Open Questions.
+- **State transitions**: For every status value listed anywhere in the source text for a given entity, there must be a corresponding row in the state transition table — even if the trigger is unknown. Use the following format:
+        - If the transition is clearly implied by the source workflow: write the from-status, to-status, and the trigger.
+        - If the status exists but no transition trigger is stated: write the from-status and to-status as (not specified in source), and add an Open Question explaining what triggers this transition and who performs it.
+        - Never omit a status value from the state transition table simply because the source does not describe how to reach it. Its presence in the status list is sufficient reason to include it.
+
 - **Role permissions**: which actor roles can perform which actions, strictly based on who the source text says performs each action.
 - **Workflow narrative**: a short, plain-language walkthrough of each major process end-to-end, citing back to the rule numbers that apply at each step.
 - **Cross-entity constraints**: rules that depend on the state of one entity affecting another (e.g., whether an active Maintenance Record implies the related Space's status must be "Under maintenance" — only state this as a definite rule if the source supports a definite direction of causality; otherwise list it as an Open Question about which direction the dependency goes).
@@ -83,6 +90,13 @@ Before extracting anything, identify the boundary between Layer A and Layer B in
 - **This is a stricter, layer-aware version of Rule 1.** Rule 1 asks "can I trace this to *any* sentence in the source?" Rule 0 narrows that further for Business Rules specifically: the traceable sentence must come from Layer B, not Layer A alone. A detail can be 100% present in the source text and still be inadmissible as a Business Rule if it only lives in Layer A.
 - **Actors and entities may draw from both layers, but verify in Layer B.** An actor mentioned only in Layer A (e.g., "staff" appearing in the narrative) must have its existence and responsibilities confirmed against Layer B's explicit role list before being added to Section 3. If Layer A names a role that Layer B's enumerated list does not include, treat Layer B's list as authoritative (apply Rule 5 — de-duplication — using Layer B as the reference set).
 - **Layer A is the primary source for Section 2 (Business Context) and may inform the problem-statement framing of Open Questions, but shouldnot be cited as the basis for any row in Section 6 (Business Rules) or Section 11 (Traceability Matrix).** Before finalizing the draft, run this check: for every Business Rule written, confirm its source sentence sits in Layer B. If it only traces to Layer A, demote it to an Open Question.
+
+### Rule 8 - Cardinality justification
+For every relationship in Section 5, you must write a one-sentence justification explaining why the chosen cardinality is correct based on the source text. Ask these two questions before deciding:
+    1. Can one instance of Entity A be linked to many instances of Entity B? (--> A is "one" side)
+    2. Can one instance of Entity B also be linked to many instances of Entity A? (--> relationship is many-to-many)
+Specifically for facilities: A facility type (e.g., projector) may exist in multiple spaces, and a space may have multiple facility types. Unless the source text explicitly states that a facility item is unique to one space, model the Space-Facility relationship as many-to-many *
+
 
 ## Workflow
 
