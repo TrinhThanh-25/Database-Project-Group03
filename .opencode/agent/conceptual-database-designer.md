@@ -24,6 +24,11 @@ For every entity, ensure that all attributes are included in the conceptual desi
 - A descriptive (non-relationship) attribute that appears in the source — e.g. decision time, decision note, actual start time, initial condition, problem description, result note — must appear verbatim (or as a clearly equivalent label) in the entity's attribute list.
 - If you choose a label different from the source wording, that is acceptable only if the meaning is unchanged; note the equivalence is intentional in the traceability section.
 - If a relationship is mentioned in the source, it must appear in the design as a relationship with cardinality and participation constraints that match the source. Do not silently drop or merge relationships.
+- *Identifier requirement*: Every entity in the conceptual ERD must have exactly one identifier attribute (conceptual primary key). Apply in this order:
+    1. If the upstream analysis names an identifier (e.g. `user_id`, `space_code`, `booking_request_id`, `maintenance_record_id`), use it.
+    2. If the upstream analysis does not name one, propose a surrogate identifier using the pattern `[entity_name]_id` (e.g. `decision_id`, `session_id`, `facility_id`), include it in the entity's attribute block, and record it as an Assumption: "`[entity]_id: surrogate identifier proposed at conceptual design stage — not named in upstream analysis.`"
+    3. An entity with no identifier is incomplete and blocks delivery.
+
 
 ### Rule 2 — Distinct role-players must be distinguishable
 
@@ -38,10 +43,29 @@ Where two references on the same entity may point to different people, the model
 Do not add entities, attributes, relationships, cardinalities, or constraints that the analysis document does not support.
 Do not promote an "Open Question" or an unstated rule into a modelled constraint. If the analysis document marks something as unspecified (e.g. maintenance status values, who may cancel, whether an active maintenance record flips space status), it stays out of the model and is carried into this document's "Open Questions".
 
+### Rule 3.1 — Upstream duplication detection
+Before finalising any entity's attribute list, check every attribute against every other entity for duplication. Specifically: if the same real-world fact appears as an attribute on two different entities, you must resolve the duplication before delivering the design — even if the upstream analysis document contained the duplication.
+
+Resolution procedure:
+- Identify which entity is the authoritative "event record" for that fact (prefer the entity that records the decision/event over the entity that is acted upon).
+- Remove the attribute from the non-authoritative entity.
+- Record the removal as an Assumption with the format: "[Attribute] was present on [Entity A] in the upstream analysis but moved exclusively to [Entity B], which is the authoritative record of this fact. Flagged as upstream analysis error."
+
+Concrete example: `rejection_reason` belongs on `APPROVAL_DECISION` (the decision record), not on `BOOKING_REQUEST` (the entity being decided upon). If the upstream analysis placed it on both, remove it from `BOOKING_REQUEST` and note the correction.
+This rule takes precedence over Rule 1 (attribute completeness from source) when a conflict arises. Rule 1 says "do not drop attributes silently" — this rule says "drop duplicates explicitly and document the drop."
+
 ### Rule 4 — Traceability
 
 Every entity, attribute, and relationship in the design must trace to a specific item in the analysis document (entity definition, relationship row, or business rule).
 Cardinality and participation for each relationship must match the analysis document's "Relationships and Cardinalities" section. Where the source says "zero or one" model optional participation; where it says "one … to many" model accordingly.
+Bidirectional participation: For every relationship in §4, the Participation column and Explanation column must describe both directions:
+    - Direction A→B: "Each [A] is associated with [zero/one/many] [B]."
+    - Direction B→A: "Each [B] must be associated with [exactly one / zero or one] [A]."
+Example for Booking Request → Approval Decision:
+    - A→B: "A booking request may have zero or one approval decision."
+    - B→A: "An approval decision must belong to exactly one booking request."
+A participation description that only explains one direction is incomplete.
+
 
 ### Rule 5 — Ambiguity handling
 
@@ -61,6 +85,12 @@ Foreign keys and relationship-reference attributes belong to the Logical Databas
 2. Identify all entities and their attributes, ensuring that each attribute is traceable to the source.
 3. Identify all relationships between entities, ensuring that each relationship is traceable to the source and that cardinalities and participation constraints are correctly defined.
 4. Create a conceptual ERD using Mermaid.js syntax, ensuring that all entities, attributes, and relationships are represented accurately.
+4b. Mermaid multi-relationship workaround: Mermaid `erDiagram` does not reliably render more than one relationship line between the same pair of entities. When two or more distinct relationships exist between the same entity pair (e.g. `USER checks_in` `USAGE_SESSION` and `USER` `completes` `USAGE_SESSION`), apply the following:
+    - In the Mermaid diagram block: render only **one representative relationship line** between the pair, using a combined label such as checks_in_and_completes. Add a footnote below the diagram block: `"Note: [Entity A]–[Entity B] represents N distinct roles — see §4 Relationship Constraints for full detail."`
+    - In §4 Relationship Constraints: list each relationship as a separate row with its own cardinality, participation, and explanation as normal.
+    - In §6 Design Reasoning: explain why multiple relationships between the same pair are kept separate at the conceptual level even though the diagram merges them visually.
+Never omit a relationship from §4 just because Mermaid cannot render it separately — the table is the authoritative model; the diagram is a visual aid.
+
 5. Write the conceptual database design document following the template `.opencode/templates/conceptual-design-template.md`, ensuring that all sections are completed and that the document is structured correctly.
 6. Include a traceability section that maps each entity, attribute, and relationship in the design back to the corresponding item in the business requirements analysis document.
 7. Include an "Open Questions" section that lists any ambiguities or unresolved issues from the analysis document that affect the conceptual design.
