@@ -59,6 +59,9 @@ Resolution procedure:
 Concrete example: `rejection_reason` belongs on `APPROVAL_DECISION` (the decision record), not on `BOOKING_REQUEST` (the entity being decided upon). If the upstream analysis placed it on both, remove it from `BOOKING_REQUEST` and note the correction.
 This rule takes precedence over Rule 1 (attribute completeness from source) when a conflict arises. Rule 1 says "do not drop attributes silently" — this rule says "drop duplicates explicitly and document the drop."
 
+### Rule 3.2 — Booking Request must not carry decision reasons
+`BOOKING_REQUEST` must not include `rejection_reason` in the conceptual attribute list. That fact belongs exclusively to `APPROVAL_DECISION` as the authoritative record of the decision event. If any draft or source copy includes `rejection_reason` on `BOOKING_REQUEST`, remove it and record the change as an `[upstream-corrected]` assumption.
+
 ### Rule 4 — Traceability
 
 Every entity, attribute, and relationship in the design must trace to a specific item in the analysis document (entity definition, relationship row, or business rule).

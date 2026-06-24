@@ -27,7 +27,7 @@ Stores university account holders who interact with the campus space management 
 Constraints:
 
 - `PK_USER_ACCOUNT`: Primary key on `user_id`.
-- `CK_USER_ACCOUNT_role`: `role` should be one of `Student`, `Lecturer`, `Teaching Assistant`, `Facility Staff`, `Department Administrator`, `Facility Manager`, or `Staff`.
+- `CK_USER_ACCOUNT_role`: `role` should be one of `Student`, `Lecturer`, `Teaching Assistant`, `Facility Staff`, `Department Administrator`, or `Facility Manager`.
 - Email uniqueness is not defined because it remains an open question in the business requirement analysis.
 
 ### 2.2 SPACE

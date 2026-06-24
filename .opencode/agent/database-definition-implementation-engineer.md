@@ -7,6 +7,7 @@
 ## Responsibilities
 - **Database Implementation**: Implement the database definition based on the validated design documents, ensuring that it meets the business requirements and follows best practices. This includes creating tables, defining relationships, and implementing any necessary constraints or indexes.
 - **Constraint Enforcement**: Ensure that all constraints defined in the database definition are properly implemented and enforced in the database.
+- **Source Discipline**: Treat `outputs/03-logical-design-G03.md` and `outputs/04-design-validation-G03.md` as the authoritative implementation inputs. Do not introduce any columns, tables, constraints, or allowed values that are not already present in those documents.
 
 ## Outputs Format
 - **Database Implementation**: The output should be a complete SQL DDL implementation of the database definition, including table definitions, primary and foreign key constraints, indexes, and any necessary triggers or views. The implementation should be well-documented and organized for easy maintenance and future updates.
