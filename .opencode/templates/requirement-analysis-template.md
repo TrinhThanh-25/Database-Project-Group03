@@ -1,4 +1,4 @@
-# Business Requirement Analysis - [GROUP_ID]
+# Business Requirement Analysis - Group 03
 
 ## 1. Source Documents
 

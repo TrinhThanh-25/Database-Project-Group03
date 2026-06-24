@@ -76,12 +76,19 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 | H1 | No SQL, no table/column definitions, no data types anywhere in the document | Search for `CREATE TABLE`, `VARCHAR`, `PRIMARY KEY`, etc. — none should appear |
 | H2 | Document stays at conceptual/business level throughout | Spot-check Section 4 and 6 for implementation-level language |
 
+## I. Self-Check Execution Log (append this when running the rubric)
+
+| # | Check | Pass criteria |
+|---|---|---|
+| I1 | The self-check execution log is completed and includes the date, time, and name of the person or agent running the check | Confirm that the log includes all required information and is complete |
+
 ---
 
 ## Self-Check Execution Log (append this when running the rubric)
 
 ```
 Run date: [date]
+Run time: [time]
 Run by: [agent / human reviewer]
 
 A1-A2: [PASS/FAIL each] — [note]
@@ -92,6 +99,7 @@ E1-E6: [PASS/FAIL each] — [note]
 F1-F2: [PASS/FAIL each] — [note]
 G1-G2: [PASS/FAIL each] — [note]
 H1-H2: [PASS/FAIL each] — [note]
+I1: [PASS/FAIL] — [note]
 
 Blocking failures remaining: [list, or "none"]
 Delivery status: [READY / NOT READY — fix blocking failures first]
