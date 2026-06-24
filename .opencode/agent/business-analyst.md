@@ -49,6 +49,7 @@ Each discrete fact must live on exactly one entity. Before adding an attribute, 
 
 - A rejection reason belongs on the Approval Decision (the record of the decision), not duplicated as a Booking Request attribute. If the source text mentions it in both contexts, attribute it to the entity that is the authoritative record of "why a decision was made" — that is the decision record, not the request being decided on.
 - If you're unsure which entity should own a fact, prefer the entity that represents the *event recording* that fact rather than the entity being *acted upon*.
+- This rule also applies within a single entity: if two attributes of the same entity appear to capture the same information (e.g., decision_note and rejection_reason on Approval Decision both potentially store the reason for a rejection), you must either (a) explicitly justify why they are distinct facts with an Assumption, or (b) merge them into one attribute and record the merge as an Assumption. Never silently include both without comment.
 
 ### Rule 4 — Distinct actions get distinct relationships
 
@@ -63,6 +64,11 @@ Before finalizing the Actors section, check every actor against every other acto
 
 - Each actor must have at least one responsibility or interaction in the source text that is NOT already fully covered by another actor's listed responsibilities.
 - If two actors appear to overlap (e.g., a generic "Staff" actor vs. "Facility Staff" / "Department Administrator"), either: (a) merge them and note the merge under Assumptions, or (b) keep them separate but add the specific distinguishing responsibility from the source text. Never list both with identical responsibility descriptions.
+- After de-duplication, group actors by their primary interaction type in the source text:
+    - Requesters -- roles whose primary described interaction is submitting booking requests.
+    - Operators -- roles whose primary described interaction is approving, rejecting, checking in, completing, or managing maintenance.
+An actor may appear in both groups if the source text explicitly gives them both types of interaction. Add a "Group" column to the Actors table. This grouping is for clarity only — it does not change which responsibilities are attributed to each actor. Verify that the "Main Responsibilities" column for every operator-group actor explicitly includes all operator actions attributed to that role in Layer B (e.g., Facility Manager must list approval as a responsibility if Layer B states it).
+
 
 ### Rule 6 — Completeness of process-level detail
 
@@ -73,7 +79,9 @@ For entities or relationships that represent multi-step processes (bookings, mai
         - If the status exists but no transition trigger is stated: write the from-status and to-status as (not specified in source), and add an Open Question explaining what triggers this transition and who performs it.
         - Never omit a status value from the state transition table simply because the source does not describe how to reach it. Its presence in the status list is sufficient reason to include it.
 
-- **Role permissions**: which actor roles can perform which actions, strictly based on who the source text says performs each action.
+    For Maintenance Records: the source provides status, start time, and completion time attributes. Even without explicit status values, you must propose a minimal lifecycle (e.g., open → in-progress → resolved) as an Assumption, and raise the exact values as an Open Question.
+
+- **Role permissions**: which actor roles can perform which actions, strictly based on who the source text says performs each action. The Role Permissions table must include a row for every distinct action implied by the state transition table, including: submit, approve, reject, cancel, check in, complete, mark as no-show, report maintenance, assign maintenance staff, and view history. If the source text does not specify who performs an action, the row must still exist with "Not specified in source" in the Allowed Role(s) column, and a corresponding Open Question must be raised.
 - **Workflow narrative**: a short, plain-language walkthrough of each major process end-to-end, citing back to the rule numbers that apply at each step.
 - **Cross-entity constraints**: rules that depend on the state of one entity affecting another (e.g., whether an active Maintenance Record implies the related Space's status must be "Under maintenance" — only state this as a definite rule if the source supports a definite direction of causality; otherwise list it as an Open Question about which direction the dependency goes).
 
