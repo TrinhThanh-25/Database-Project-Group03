@@ -84,6 +84,15 @@ For entities or relationships that represent multi-step processes (bookings, mai
 - **Role permissions**: which actor roles can perform which actions, strictly based on who the source text says performs each action. The Role Permissions table must include a row for every distinct action implied by the state transition table, including: submit, approve, reject, cancel, check in, complete, mark as no-show, report maintenance, assign maintenance staff, and view history. If the source text does not specify who performs an action, the row must still exist with "Not specified in source" in the Allowed Role(s) column, and a corresponding Open Question must be raised.
 - **Workflow narrative**: a short, plain-language walkthrough of each major process end-to-end, citing back to the rule numbers that apply at each step.
 - **Cross-entity constraints**: rules that depend on the state of one entity affecting another (e.g., whether an active Maintenance Record implies the related Space's status must be "Under maintenance" — only state this as a definite rule if the source supports a definite direction of causality; otherwise list it as an Open Question about which direction the dependency goes).
+- **Mandatory open question checklist**: Before finalising Section 13, verify that the following categories of questions have been considered and — if not answered by Layer B — added to Open Questions:
+
+    1. Multi-role: Can a user hold more than one role simultaneously, or is each account restricted to exactly one role?
+    2. Amendment: Can a booking request be modified (time, space, participant count) after submission but before approval? If so, who can amend it and does it reset to Pending?
+    3. Duration limits: Does the source imply any minimum or maximum booking duration? If not stated, raise it.
+    4. Retroactive conflict: What happens to an already-approved booking if the space is subsequently placed under maintenance? The conflict prevention rules only address new bookings.
+    5. Status cascade: Does creating or activating a Maintenance Record automatically change the Space's status to "under maintenance", or is the Space status updated independently?
+    6. Scope of "staff" in viewing rules: Layer B says "staff should be able to view…" — does this apply equally to all staff roles (facility staff, facility manager, department administrator) or only to some?
+
 
 ### Rule 7 — Source layering: narrative context vs. authoritative requirement
 
@@ -116,7 +125,22 @@ Specifically for facilities: A facility type (e.g., projector) may exist in mult
 6. Extract relationships and cardinalities, applying Rule 4.
 7. Extract business rules, applying Rule 0 and Rule 1 together: a rule is only admissible if it traces to Layer B AND is not an invented elaboration beyond what Layer B states. If a detail exists only in Layer A, do not write it as a rule — route it to Open Questions instead.
 8. Fill in state transitions, role permissions, workflow narratives, and cross-entity constraints per Rule 6 (applying the same Layer B-only standard from Rule 0 to anything stated as definite).
+
+8.1 Cross-section consistency check: After filling in all sections, verify that each piece of information is consistent across every section that references it. Specifically:
+    - Every action listed in Section 8 (Role Permissions) for a given actor must also appear in that actor's "Main Responsibilities" column in Section 3 (Actors).
+    - Every status value listed in Section 4 (Entity attributes) must appear in Section 7 (State Transitions).
+    - Every entity mentioned in Section 6 (Business Rules) must have a corresponding entry in Section 4 (Entities) and Section 5 (Relationships).
+    - Every relationship in Section 5 must be traceable to at least one rule in Section 6 and one row in Section 11 (Traceability Matrix).
+If a discrepancy is found, fix it in all affected sections before proceeding to Step 9.
+
 9. Re-read the full draft once against Rule 0 and Rule 1 specifically — these are the rules most likely to be silently violated — before considering the draft complete.
+
+9.1 Terminology consistency check: Before running the rubric self-check, scan the entire draft for any case where the same real-world concept is referred to by two different names (e.g., "closed" vs "temporarily closed", "manager", vs "facility manager", "staff" vs "facility staff"). For each discrepancy found: 
+    - If one term comes from Layer B's enumerated list, use that term everywhere and note the standardisation as an Assumption.
+    - If both terms come from Layer B and cannot be reconciled, raise it as an Open Question.
+    - Never leave two different terms for the same concept silently coexisting in Business Rules and Entity definitions.
+
+
 10. Run the self-check in `.opencode/evaluation/requirement-analysis-rubric.md`. Fix any Blocking failure and re-run the check; do not deliver while a Blocking item still fails. If a check can't be resolved cleanly, move the item to Open Questions rather than forcing a pass.
 11. Write the final document to `outputs/01-business-req-analysis-G03.md` following the template, only after step 10 passes.
 12. Report back: which input file was actually used (if it differed from the requested path), a short list of items moved to Open Questions because they could not be grounded in Layer B, any assumptions made and recorded under "Assumptions", and any difficulties encountered in analyzing the source text (with suggestions for what would have made the analysis easier).
