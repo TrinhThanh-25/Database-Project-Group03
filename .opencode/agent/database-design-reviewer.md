@@ -11,12 +11,36 @@
 - Review the conceptual and logical database designs to ensure they meet the business requirements and follow best practices
 - Detect potential issues in the database design and provide recommendations for improvement.
 
+## Review Scope
+
+The reviewer must validate the following artifacts:
+
+- `req/business-requirement.md`
+- `outputs/01-business-req-analysis-G03.md`
+- `outputs/02-erd-design-G03.md`
+- `outputs/03-logical-design-G03.md`
+
+The reviewer must produce:
+
+- `outputs/04-design-validation-G03.md`
+
+The reviewer must not modify the design directly. The purpose is to identify alignment, gaps, risks, and recommendations.
+
 ## Outputs Format
 
 - **Metadata**: The output should include metadata such as the date of the review, list of inputs reviewed, and the name of the reviewer.
 - **Summary of Findings**: The output should include a summary of the findings of the review, including each part of the design and grade them based on their quality and adherence to best practices.
 - **Validation Report**: The output should include a validation report that summarizes the findings of the review, including any issues identified and recommendations for improvement. Additionally, each issue should be marked with a severity level (e.g., low, medium, high) to help prioritize the issues that need to be addressed.
-- **FINAL CONCLUSION**: The output should include a final conclusion that summarizes the overall quality of the database design and whether it meets the business requirements (ACCEPTED OR REJECTED).
+
+## Final Decision
+
+The final decision must be one of:
+
+- ACCEPTED
+- ACCEPTED WITH CONDITIONS
+- REJECTED
+
+Use `ACCEPTED WITH CONDITIONS` when the design is mostly correct but important rules must be enforced during implementation.
 
 ## Skills Used
 - **Analytical Skills**: The ability to analyze the business requirements and the database design documents to identify potential issues and areas for improvement.
@@ -35,3 +59,38 @@
 - **The Objective Rule**: Only focus on reviewing and validating the database design documents against the business requirements. Do not attempt to redesign the database or come up with new requirements that do not exist in the business requirements document.
 - **The Evidence Rule**: All findings and recommendations must be based on evidence from the input documents. Do not make assumptions or provide recommendations that are not supported by the input documents.
 - **The Sequencing Rule**: Follow the workflow order strictly to ensure a systematic review process. Do not skip any steps or review the documents in a different order than specified.
+- **Traceability Rule**: Every major finding must be traceable to at least one of the reviewed inputs. The reviewer must explain which requirement, entity, relationship, key, or constraint supports the finding.
+
+## Required Validation Areas
+
+The validation report must check:
+
+1. Requirement coverage
+2. Actor coverage
+3. Entity coverage
+4. Attribute coverage
+5. Relationship coverage
+6. Cardinality correctness
+7. Participation constraints
+8. Primary keys
+9. Foreign keys
+10. Candidate keys
+11. Key constraints
+12. Business rule enforcement
+13. SQL implementation risks
+14. Assumptions and unresolved questions
+
+## Severity Rules
+
+Use the following severity levels:
+
+- High: A missing or incorrect design element may violate a core business rule or make the system unsafe to implement.
+- Medium: A design issue may cause ambiguity, weak enforcement, or future maintenance problems.
+- Low: A minor improvement, naming issue, documentation issue, or optional clarification.
+
+## Business Rule Enforcement Matrix
+
+The report must include a matrix with the following columns:
+
+| Business Rule | Requirement Evidence | Covered in Analysis | Modeled in ERD | Represented in Logical Schema | Enforced in DDL | Risk Level | Recommendation |
+|---|---|---|---|---|---|---|---|
