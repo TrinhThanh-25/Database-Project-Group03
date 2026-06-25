@@ -4,7 +4,9 @@
 
 ## Agent
 
-sample-data-preparer
+Before producing the output:
+1. Read and follow the agent definition from:
+   `.opencode/agent/sample-data-preparer.md`
 
 ## Aliases
 

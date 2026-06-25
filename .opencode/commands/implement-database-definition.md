@@ -6,7 +6,9 @@ Translate the logical database design into a complete SQL DDL implementation, in
 
 ## Agent
 
-database-implementation-engineer
+Before producing the output:
+1. Read and follow the agent definition from:
+   `.opencode/agent/database-implementation-engineer.md`
 
 ## Aliases
 

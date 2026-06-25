@@ -12,3 +12,13 @@
 2026-06-25 12:20:00 +07 — Reviewed submitted analysis, conceptual ERD, and logical schema against original requirements. Found strong traceability and no missing core entities or relationships.
 2026-06-25 12:20:00 +07 — Identified main implementation conditions: approved-booking overlap prevention, unavailable-space booking prevention, role restrictions, conditional rejection reason, and maintenance/status lifecycle clarification.
 2026-06-25 12:20:00 +07 — Assigned final decision `ACCEPTED WITH CONDITIONS` because the design is mostly correct but critical rules must be enforced during implementation.
+
+2026-06-25 13:20:00 +07 — Reviewed DDL against logical design for exact table/column coverage, PK/FK/unique/check constraint names, SQL Server data types, and allowed-value discipline.
+2026-06-25 13:20:00 +07 — Reviewed implementation conditions from validation report: overlap prevention, unavailable-space prevention, role restrictions, rejection reason condition, and completion consistency are implemented with triggers.
+2026-06-25 13:20:00 +07 — Reviewed unresolved items and intentionally left maintenance status values, account status values, capacity comparison, requester eligibility, requested equipment, and workflow transitions unenforced because they remain open in the validated design.
+
+2026-06-25 13:40:00 +07 — Reviewed sample data against DDL constraints and triggers, especially allowed values, unavailable-space booking prevention, approved-overlap prevention, role restrictions, and rejected-booking rejection reason.
+2026-06-25 13:40:00 +07 — Confirmed sample data covers normal operations plus required exceptional scenarios without adding unsupported tables or columns; department data is represented through `USER_ACCOUNT.department` because no department table exists.
+
+2026-06-25 13:50:00 +07 — Reviewed SQL query design against actual DDL and sample data to ensure table/column names are valid and queries answer realistic business questions for students, lecturers, facility staff, department administrators, and facility managers.
+2026-06-25 13:50:00 +07 — Confirmed output contains ten meaningful read-only SELECT queries with joins, filters, grouping, aggregation, ordering, and required explanatory comments.

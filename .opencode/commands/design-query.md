@@ -4,7 +4,9 @@
 
 ## Agent
 
-sql-query-designer
+Before producing the output:
+1. Read and follow the agent definition from:
+   `.opencode/agent/sql-query-designer.md`
 
 ## Aliases
 
