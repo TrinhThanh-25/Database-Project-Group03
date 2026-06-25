@@ -64,6 +64,10 @@ Possible [enum field name]s (if applicable):
 | Report maintenance issue | ... | ... |
 | Assign maintenance staff | ... | ... |
 
+Populate ALL actions found in source.
+Minimum rows shown below are examples only.
+Add additional rows as required.
+
 ## 9. Workflow Narratives
 
 ### 9.1 Booking Lifecycle (request → approval → check-in → completion)

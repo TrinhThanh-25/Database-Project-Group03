@@ -24,15 +24,18 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 | # | Check | Pass criteria |
 |---|---|---|
 | B1 | For every entity in Section 4, every attribute listed matches what is actually stated in the business requirement — no attribute missing that the source mentions, and no attribute added that the source does not mention | Cross-check each entity's attribute list line by line against the source text |
-| B2 | For every entity in Section 4 that has a relationship with another entity (per Section 5), its attribute list includes an attribute representing that link — not only implied via the Relationships table | For each related entity pair, confirm the linking attribute (e.g., the related entity or person) appears as its own line in Section 4, not just in Section 5 |
+| B2 | No entity in Section 4 has an attribute whose sole purpose is to reference, identify, assign, select, or associate another entity — all connections between entities belong in Section 5 (Relationships) only | For each entity's attribute list, verify no attribute is a foreign-key-style reference or role-pointer to another entity (e.g., "requested space", "decided by", "checked in by" must NOT appear as attributes — they must appear as relationships in Section 5) |
 | B3 | No fact is listed as an attribute on two different entities | Search the whole document for repeated attribute names/concepts across entities |
-| B4 | Rejection reason appears only on Approval Decision, not on Booking Request | Confirmed by inspection of Section 4.4 and 4.5 |
+| B4 | Rejection reason appears only on Approval Decision, not on Booking Request | Check every entity's attribute list by name; confirm rejection reason (or equivalent) appears only in the Approval Decision entity, not in the Booking Request entity |
+| B5 | Terminology consistency check: No two different names are used for the same real-world concept | Scan the entire draft for any case where the same real-world concept is referred to by two different names (e.g., "closed" vs "temporarily closed", "manager", vs "facility manager", "staff" vs "facility staff") |
+
+
 
 ## C. Relationships and Distinct Actions (Blocking) — corresponds to Workflow step 6
 
 | # | Check | Pass criteria |
 |---|---|---|
-| C1 | "Checked in by" and "completed by" are modeled as two separate fields/relationships | Confirmed in Section 4.6 and Section 5 |
+| C1 | "Checked in by" and "completed by" are modeled as two separate relationships | Check the Usage Session entity and Section 5; confirm both are present as separate relationship entries, not merged into one |
 | C2 | Any other pair of actions that the source allows to be performed by different people at different times are kept separate | Scan Section 5 relationships for any "merged" multi-action rows |
 
 ## D. Business Rules and Source-Grounding (Blocking) — corresponds to Workflow step 7
@@ -76,15 +79,15 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 | H1 | No SQL, no table/column definitions, no data types anywhere in the document | Search for `CREATE TABLE`, `VARCHAR`, `PRIMARY KEY`, etc. — none should appear |
 | H2 | Document stays at conceptual/business level throughout | Spot-check Section 4 and 6 for implementation-level language |
 
-## I. Self-Check Execution Log (append this when running the rubric)
+## I. Self-Check Execution Log (write to `.opencode/logging/self-check-log.md`)
 
 | # | Check | Pass criteria |
 |---|---|---|
-| I1 | The self-check execution log is completed and includes the date, time, and name of the person or agent running the check | Confirm that the log includes all required information and is complete |
+| I1 | The self-check execution log is completed and written to `.opencode/logging/self-check-log.md`, including the date, time, and name of the person or agent running the check | Confirm the log file exists at the correct path and includes all required fields |
 
 ---
 
-## Self-Check Execution Log (append this when running the rubric)
+## Self-Check Execution Log (write to `.opencode/logging/self-check-log.md`)
 
 ```
 Run date: [date]
@@ -92,7 +95,7 @@ Run time: [time]
 Run by: [agent / human reviewer]
 
 A1-A2: [PASS/FAIL each] — [note]
-B1-B4: [PASS/FAIL each] — [note]
+B1-B5: [PASS/FAIL each] — [note]
 C1-C2: [PASS/FAIL each] — [note]
 D1-D4: [PASS/FAIL each] — [note]
 E1-E6: [PASS/FAIL each] — [note]

@@ -2,7 +2,7 @@
 
 ## Project context
 
-- Project directory: <!-- YOUR ROOT DIRECTORY -->
+- Project directory: `.` (the repository root where this file lives)
 - Project type: This is a demo project, not production.
 - Run `ls -la` to detect new files before assuming anything exists.
 
@@ -60,13 +60,16 @@ These apply across all 7 agents, not only the first step:
 - Use Mermaid `erDiagram` for ERD (conceptual-database-designer stage).
 - Do not silently invent rules, constraints, or design decisions beyond what the previous stage's output (or, for stage 1, Layer B of the raw requirement) actually supports. When in doubt, raise it as an Open Question rather than asserting it as fact.
 - Each agent loads its own detailed workflow, extraction/design rules, applicable template, and applicable evaluation rubric from its own agent file before producing output. This file (`AGENTS.md`) only defines routing and shared conventions — it does not restate per-agent steps.
+- All the self-check of the agent must be log in `.opencode/logging/self-check-log.md` file, not in the output file. The output file is for the user, not for the agent's internal self-check.
+- All the command run and the reasoning steps must be log in `.opencode/logging/run-command-log.md` file, not in the output file. The output file is for the user, not for the agent's internal command log.
+- All the review comments must be briefly log in `.opencode/logging/review-log.md` file, not in the output file. The output file is for the user, not for the agent's internal review log.
 
 ## Outputs Format
 
 - `outputs/01-business-req-analysis-G03.md`
-- `outputs/02-conceptual-design-G03.md`
+- `outputs/02-erd-design-G03.md`
 - `outputs/03-logical-design-G03.md`
 - `outputs/04-design-validation-G03.md`
-- `outputs/05-database-implementation-G03.sql`
+- `outputs/05-db-definition-G03.sql`
 - `outputs/06-sample-data-G03.sql`
 - `outputs/07-query-design-G03.sql`
