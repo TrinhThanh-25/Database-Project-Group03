@@ -1,256 +1,280 @@
-# Conceptual Database Design - G03
+# Conceptual Database Design - Group 03
 
-## 1. Source Document
+## 1. Source Documents
 
-- Input: `outputs/01-business-req-analysis-G03.md`
-- Target system: Campus Space Management System
-- Design level: Conceptual database design
-
-This document translates the business requirement analysis into a conceptual Entity-Relationship Diagram. It intentionally does not define relational tables, foreign keys, SQL, or junction tables. Many-to-many relationships are preserved at this stage as required.
+- Requested input: `outputs/01-business-req-analysis-G03.md`
+- Actual input used: `outputs/01-business-req-analysis-G03.md`
 
 ## 2. Conceptual ERD
 
 ```mermaid
 erDiagram
     USER {
-        string user_id
-        string full_name
-        string email
-        string phone_number
-        string role
-        string department
-        string account_status
+        identifier user_id PK
+        attribute full_name
+        attribute email
+        attribute phone_number
+        attribute role
+        attribute department
+        attribute account_status
     }
 
     SPACE {
-        string space_code
-        string space_name
-        string space_type
-        string building
-        string floor
-        string room_number
-        int capacity
-        string current_status
-        string usage_policy
+        identifier unique_space_code PK
+        attribute space_name
+        attribute space_type
+        attribute building
+        attribute floor
+        attribute room_number
+        attribute capacity
+        attribute current_status
+        attribute usage_policy
     }
 
     FACILITY {
-        string facility_name_or_type
-        string facility_description
+        identifier facility_id PK
+        attribute facility_name
     }
 
     BOOKING_REQUEST {
-        string booking_request_id
-        datetime requested_start_time
-        datetime requested_end_time
-        string purpose_of_use
-        int expected_number_of_participants
-        string booking_type
-        string booking_status
-        string rejection_reason
+        identifier booking_id PK
+        attribute requested_start_time
+        attribute requested_end_time
+        attribute purpose_of_use
+        attribute expected_number_of_participants
+        attribute booking_type
+        attribute status
     }
 
     APPROVAL_DECISION {
-        string decision_outcome
-        datetime decision_time
-        string decision_note
-        string rejection_reason
+        identifier approval_decision_id PK
+        attribute decision_time
+        attribute decision_note
+        attribute rejection_reason
     }
 
     USAGE_SESSION {
-        datetime actual_start_time
-        string initial_condition
-        datetime actual_end_time
-        string final_condition
-        string usage_notes
+        identifier usage_session_id PK
+        attribute actual_start_time
+        attribute initial_condition_of_the_space
+        attribute actual_end_time
+        attribute final_condition_of_the_space
+        attribute usage_notes
     }
 
     MAINTENANCE_RECORD {
-        string maintenance_record_id
-        string problem_description
-        datetime start_time
-        datetime completion_time
-        string maintenance_status
-        string result_note
+        identifier maintenance_record_id PK
+        attribute problem_description
+        attribute start_time
+        attribute completion_time
+        attribute status
+        attribute result_note
     }
 
     USER ||--o{ BOOKING_REQUEST : submits
-    SPACE ||--o{ BOOKING_REQUEST : is_requested_for
-    SPACE }o--o{ FACILITY : has
-    BOOKING_REQUEST ||--o| APPROVAL_DECISION : receives
+    SPACE ||--o{ BOOKING_REQUEST : selected_for
+    SPACE }o--o{ FACILITY : has_available
+    BOOKING_REQUEST ||--o| APPROVAL_DECISION : has_decision
     USER ||--o{ APPROVAL_DECISION : makes
-    BOOKING_REQUEST ||--o| USAGE_SESSION : has
-    USER ||--o{ USAGE_SESSION : checks_in
-    USER ||--o{ USAGE_SESSION : completes
-    SPACE ||--o{ MAINTENANCE_RECORD : has
-    USER ||--o{ MAINTENANCE_RECORD : reports
-    USER ||--o{ MAINTENANCE_RECORD : is_assigned_to
+    BOOKING_REQUEST ||--o| USAGE_SESSION : has_session
+    USER ||--o{ USAGE_SESSION : checks_in_and_completes
+    SPACE ||--o{ MAINTENANCE_RECORD : has_record
+    USER ||--o{ MAINTENANCE_RECORD : reports_and_is_assigned
 ```
 
-## 3. Entity Explanations
+> Note: Where two or more distinct relationships exist between the same entity pair, only one representative line is shown in the diagram. See §4 Relationship Constraints for the full detail of each relationship.
+> Note: `USER`–`USAGE_SESSION` represents 2 distinct roles: check-in person and completion person. `USER`–`MAINTENANCE_RECORD` represents 2 distinct roles: reporter and assigned staff member. See §4 Relationship Constraints for full detail.
+
+## 3. Entity Definitions
 
 ### 3.1 User
 
-Represents any university account holder who interacts with the system. This includes students, lecturers, teaching assistants, staff, facility staff, department administrators, and facility managers.
+A university account holder whose basic information and role are stored by the system.
 
-Key attributes:
+Attributes:
+- User ID *(identifier)* — source: upstream §4.1 User attribute list; BR-2.
+- Full name — source: upstream §4.1 User attribute list; BR-2.
+- Email — source: upstream §4.1 User attribute list; BR-2.
+- Phone number — source: upstream §4.1 User attribute list; BR-2.
+- Role — source: upstream §4.1 User attribute list; BR-2.
+- Department — source: upstream §4.1 User attribute list; BR-2.
+- Account status — source: upstream §4.1 User attribute list; BR-2.
 
-- `user_id`: Identifies the user account.
-- `full_name`: User's full name.
-- `email`: User's university email or account contact email.
-- `phone_number`: Contact number.
-- `role`: Operational role, such as student, lecturer, teaching assistant, facility staff, department administrator, facility manager, or staff.
-- `department`: Department associated with the user.
-- `account_status`: Current account state.
-
-Traceability:
-
-- Supports user management requirements.
-- Supports requester, approver, check-in staff, completion staff, reporter, and assigned maintenance staff roles.
+> Relationships involving this entity are listed in §4 Relationship Constraints.
 
 ### 3.2 Space
 
-Represents a shared physical campus space that can be requested for use.
+A bookable shared campus space managed by the School.
 
-Key attributes:
+Attributes:
+- Unique space code *(identifier)* — source: upstream §4.2 Space attribute list; BR-3.
+- Space name — source: upstream §4.2 Space attribute list; BR-3.
+- Space type — source: upstream §4.2 Space attribute list; BR-3.
+- Building — source: upstream §4.2 Space attribute list; BR-3.
+- Floor — source: upstream §4.2 Space attribute list; BR-3.
+- Room number — source: upstream §4.2 Space attribute list; BR-3.
+- Capacity — source: upstream §4.2 Space attribute list; BR-3.
+- Current status — source: upstream §4.2 Space attribute list; BR-3.
+- Usage policy — source: upstream §4.2 Space attribute list; BR-3.
 
-- `space_code`: Unique code identifying the space.
-- `space_name`: Human-readable name of the space.
-- `space_type`: Type of space, such as auditorium, classroom, computer laboratory, project laboratory, meeting room, or student workspace.
-- `building`, `floor`, `room_number`: Physical location details.
-- `capacity`: Maximum or intended occupancy capacity.
-- `current_status`: Availability state, such as available, in use, under maintenance, temporarily closed, or retired.
-- `usage_policy`: Business guidance controlling how the space may be used.
-
-Traceability:
-
-- Supports space management, booking availability control, maintenance tracking, and utilization history requirements.
+> Relationships involving this entity are listed in §4 Relationship Constraints.
 
 ### 3.3 Facility
 
-Represents equipment or facility features available in one or more spaces.
+A facility type that can be available in one or more spaces.
 
-Key attributes:
+Attributes:
+- Facility ID *(identifier)* — source: upstream §4.3 Facility attribute list; proposed identifier recorded in upstream §12 Assumptions.
+- Facility name — source: upstream §4.3 Facility attribute list.
 
-- `facility_name_or_type`: Name or category of the facility, such as projector, whiteboard, microphone, computer, livestreaming equipment, or air conditioner.
-- `facility_description`: Optional additional description.
-
-Traceability:
-
-- Supports the requirement to store the list of facilities available in each space.
+> Relationships involving this entity are listed in §4 Relationship Constraints.
 
 ### 3.4 Booking Request
 
-Represents a user's request to reserve and use a selected space for a requested time period.
+A user-submitted request to use a selected space for a requested time period and purpose.
 
-Key attributes:
+Attributes:
+- Booking ID *(identifier)* — source: upstream §4.4 Booking Request attribute list; proposed identifier recorded in upstream §12 Assumptions.
+- Requested start time — source: upstream §4.4 Booking Request attribute list; BR-5.
+- Requested end time — source: upstream §4.4 Booking Request attribute list; BR-5.
+- Purpose of use — source: upstream §4.4 Booking Request attribute list; BR-5.
+- Expected number of participants — source: upstream §4.4 Booking Request attribute list; BR-5.
+- Booking type — source: upstream §4.4 Booking Request attribute list; BR-6.
+- Status — source: upstream §4.4 Booking Request attribute list; BR-7.
 
-- `booking_request_id`: Identifies the booking request.
-- `requested_start_time`: Requested start date and time.
-- `requested_end_time`: Requested end date and time.
-- `purpose_of_use`: Reason for using the space.
-- `expected_number_of_participants`: Expected attendance count.
-- `booking_type`: Activity type, such as lecture, examination, seminar, workshop, meeting, student activity, or administrative event.
-- `booking_status`: Current booking lifecycle status, such as pending, approved, rejected, cancelled, checked in, completed, or no-show.
-- `rejection_reason`: Reason stored when the request is rejected.
-
-Traceability:
-
-- Supports booking submission, conflict prevention, approval management, no-show tracking, and historical booking requirements.
+> Relationships involving this entity are listed in §4 Relationship Constraints.
 
 ### 3.5 Approval Decision
 
-Represents the decision made for a booking request when approval or rejection is recorded.
+The recorded approval or rejection decision for a booking request that requires approval.
 
-Key attributes:
+Attributes:
+- Approval Decision ID *(identifier)* — source: upstream §4.5 Approval Decision attribute list; proposed identifier recorded in upstream §12 Assumptions.
+- Decision time — source: upstream §4.5 Approval Decision attribute list; BR-12.
+- Decision note — source: upstream §4.5 Approval Decision attribute list; BR-12.
+- Rejection reason — source: upstream §4.5 Approval Decision attribute list; BR-13.
 
-- `decision_outcome`: Approval or rejection outcome.
-- `decision_time`: Time when the decision was made.
-- `decision_note`: Staff or manager note attached to the decision.
-- `rejection_reason`: Reason for rejection when applicable.
-
-Traceability:
-
-- Supports the requirement to record who approved or rejected a booking, when the decision happened, the decision note, and rejection reason.
+> Relationships involving this entity are listed in §4 Relationship Constraints.
 
 ### 3.6 Usage Session
 
-Represents the actual use of a space after a booking is checked in and later completed.
+The recorded actual use of a booking from check-in through completion.
 
-Key attributes:
+Attributes:
+- Usage Session ID *(identifier)* — source: upstream §4.6 Usage Session attribute list; proposed identifier recorded in upstream §12 Assumptions.
+- Actual start time — source: upstream §4.6 Usage Session attribute list; BR-15.
+- Initial condition of the space — source: upstream §4.6 Usage Session attribute list; BR-15.
+- Actual end time — source: upstream §4.6 Usage Session attribute list; BR-17.
+- Final condition of the space — source: upstream §4.6 Usage Session attribute list; BR-17.
+- Usage notes — source: upstream §4.6 Usage Session attribute list; BR-17.
 
-- `actual_start_time`: Actual check-in or session start time.
-- `initial_condition`: Condition of the space at check-in.
-- `actual_end_time`: Actual completion or session end time.
-- `final_condition`: Condition of the space at completion.
-- `usage_notes`: Notes recorded after use.
-
-Traceability:
-
-- Supports check-in, completion, condition recording, and usage history requirements.
+> Relationships involving this entity are listed in §4 Relationship Constraints.
 
 ### 3.7 Maintenance Record
 
-Represents a reported or managed maintenance issue for a space.
+A record of a maintenance problem and its handling for a space.
 
-Key attributes:
+Attributes:
+- Maintenance Record ID *(identifier)* — source: upstream §4.7 Maintenance Record attribute list; proposed identifier recorded in upstream §12 Assumptions.
+- Problem description — source: upstream §4.7 Maintenance Record attribute list; BR-19.
+- Start time — source: upstream §4.7 Maintenance Record attribute list; BR-19.
+- Completion time — source: upstream §4.7 Maintenance Record attribute list; BR-19.
+- Status — source: upstream §4.7 Maintenance Record attribute list; BR-19.
+- Result note — source: upstream §4.7 Maintenance Record attribute list; BR-19.
 
-- `maintenance_record_id`: Identifies the maintenance record.
-- `problem_description`: Description of the issue, such as broken projector, air-conditioning failure, damaged furniture, cleaning issue, or network problem.
-- `start_time`: Time maintenance issue or activity starts.
-- `completion_time`: Time maintenance is completed.
-- `maintenance_status`: Current maintenance state.
-- `result_note`: Resolution or result note.
-
-Traceability:
-
-- Supports maintenance management, unavailable-space control, spaces-under-maintenance reporting, and maintenance history requirements.
+> Relationships involving this entity are listed in §4 Relationship Constraints.
 
 ## 4. Relationship Constraints
 
-| Relationship | Cardinality | Participation | Explanation |
-|---|---:|---|---|
-| User submits Booking Request | 1:N | Booking Request mandatory; User optional | Each booking request must be submitted by one user. A user may submit zero or many booking requests. |
-| Space is requested for Booking Request | 1:N | Booking Request mandatory; Space optional | Each booking request selects one space. A space may have zero or many booking requests over time. |
-| Space has Facility | M:N | Optional on both sides | A space may have zero or many facilities. A facility type may appear in zero or many spaces. This many-to-many relationship is preserved conceptually. |
-| Booking Request receives Approval Decision | 1:0..1 | Approval Decision optional for Booking Request | A booking request may require approval and then receive one decision. Some bookings may not yet have a decision, and some may not require one. |
-| User makes Approval Decision | 1:N | Approval Decision mandatory; User optional | Each approval decision is made by one authorized facility staff member or manager. A user may make zero or many decisions. |
-| Booking Request has Usage Session | 1:0..1 | Usage Session optional for Booking Request | A checked-in booking has usage information. Pending, rejected, cancelled, or no-show bookings may not have a usage session. |
-| User checks in Usage Session | 1:N | Usage Session mandatory at check-in; User optional | Each checked-in session records the facility staff member who performed check-in. A user may check in zero or many sessions. |
-| User completes Usage Session | 1:N | Usage Session mandatory at completion; User optional | Each completed session records completion details handled by facility staff. A user may complete zero or many sessions. |
-| Space has Maintenance Record | 1:N | Maintenance Record mandatory; Space optional | Each maintenance record belongs to one space. A space may have zero or many maintenance records over time. |
-| User reports Maintenance Record | 1:N | Maintenance Record mandatory; User optional | Each maintenance record stores one reporter. A user may report zero or many maintenance records. |
-| User is assigned to Maintenance Record | 1:N | Maintenance Record optional on assigned staff | Each maintenance record may have one assigned staff member. A staff user may be assigned zero or many records. |
+This table is the authoritative relationship model. The Mermaid diagram in §2 is a visual aid only.
+
+| Relationship Name | Entity A | Entity B | Cardinality | Participation | Explanation |
+|---|---|---|---|---|---|
+| SUBMITS | User | Booking Request | 1 to 0..* | A→B: Each User may submit zero or many Booking Requests. B→A: Each Booking Request must be submitted by exactly one User. | Source: upstream §5 “User submits Booking Request”; BR-5. |
+| SELECTS_SPACE | Space | Booking Request | 1 to 0..* | A→B: Each Space may be selected by zero or many Booking Requests over time. B→A: Each Booking Request must select exactly one Space. | Source: upstream §5 “Booking Request selects Space”; BR-5. |
+| HAS_FACILITY | Space | Facility | 0..* to 0..* | A→B: Each Space may have zero or many Facilities. B→A: Each Facility may be available in zero or many Spaces. | Source: upstream §5 “Space has Facility”; BR-4. |
+| HAS_APPROVAL_DECISION | Booking Request | Approval Decision | 1 to 0..1 | A→B: Each Booking Request may have zero or one Approval Decision. B→A: Each Approval Decision must belong to exactly one Booking Request. | Source: upstream §5 “Booking Request has Approval Decision”; BR-11, BR-12, BR-13. |
+| MAKES_DECISION | User | Approval Decision | 1 to 0..* | A→B: Each User may make zero or many Approval Decisions. B→A: Each Approval Decision must be made by exactly one User. | Source: upstream §5 “User makes Approval Decision”; BR-12. |
+| HAS_USAGE_SESSION | Booking Request | Usage Session | 1 to 0..1 | A→B: Each Booking Request may have zero or one Usage Session. B→A: Each Usage Session must belong to exactly one Booking Request. | Source: upstream §5 “Booking Request has Usage Session”; BR-14 through BR-17. |
+| CHECKED_IN_BY | User | Usage Session | 1 to 0..* | A→B: Each User may check in zero or many Usage Sessions. B→A: Each Usage Session must be checked in by exactly one User. | Source: upstream §5 “User checks in Usage Session”; BR-15. |
+| COMPLETED_BY | User | Usage Session | 1 to 0..* | A→B: Each User may complete zero or many Usage Sessions. B→A: Each Usage Session may be completed by zero or one User until completion occurs, and a completed session has exactly one completing User. | Source: upstream §5 “User completes Usage Session”; BR-16, BR-17. |
+| HAS_MAINTENANCE_RECORD | Space | Maintenance Record | 1 to 0..* | A→B: Each Space may have zero or many Maintenance Records. B→A: Each Maintenance Record must relate to exactly one Space. | Source: upstream §5 “Space has Maintenance Record”; BR-18, BR-19. |
+| REPORTED_BY | User | Maintenance Record | 1 to 0..* | A→B: Each User may report zero or many Maintenance Records. B→A: Each Maintenance Record must have exactly one reporter User. | Source: upstream §5 “User reports Maintenance Record”; BR-19. |
+| ASSIGNED_TO | User | Maintenance Record | 1 to 0..* | A→B: Each User may be assigned to zero or many Maintenance Records. B→A: Each Maintenance Record must have exactly one assigned staff User. | Source: upstream §5 “User is assigned to Maintenance Record”; BR-19. |
 
 ## 5. Business Rule Coverage
 
-| Business Rule Area | Conceptual Design Support |
+For every business rule in the upstream analysis (Section 6), explain how the conceptual design supports it, or explicitly state that enforcement is deferred.
+
+| Upstream Rule | How the Design Supports It |
 |---|---|
-| University account requirement | Captured by `USER` entity and user account attributes. |
-| Unique space code | Captured as key conceptual attribute `space_code` on `SPACE`. |
-| Space status control | Captured by `current_status` on `SPACE`. |
-| Facility list per space | Captured by M:N relationship between `SPACE` and `FACILITY`. |
-| Booking request submission | Captured by `USER` to `BOOKING_REQUEST` and `SPACE` to `BOOKING_REQUEST` relationships. |
-| No overlapping approved bookings | Captured as a business rule associated with `BOOKING_REQUEST` and `SPACE`; enforcement is deferred to logical/implementation design. |
-| Unavailable spaces cannot be booked | Captured through `SPACE.current_status`, `MAINTENANCE_RECORD`, and the relationship between `SPACE` and `BOOKING_REQUEST`. |
-| Approval tracking | Captured by `APPROVAL_DECISION` and its relationships to `BOOKING_REQUEST` and `USER`. |
-| Check-in and completion tracking | Captured by `USAGE_SESSION` and its relationships to `BOOKING_REQUEST` and `USER`. |
-| Maintenance tracking | Captured by `MAINTENANCE_RECORD` and its relationships to `SPACE` and `USER`. |
-| Historical records | Captured by retaining `BOOKING_REQUEST`, `USAGE_SESSION`, `APPROVAL_DECISION`, and `MAINTENANCE_RECORD` as historical business events. |
+| BR-1: Each user must have a university account. | Captured by the User entity and User ID identifier. |
+| BR-2: The system stores user ID, full name, email, phone number, role, department, and account status for each user. | Captured by the User entity attributes in §3.1. |
+| BR-3: For each space, the system stores a unique space code, space name, space type, building, floor, room number, capacity, current status, and usage policy. | Captured by the Space entity attributes in §3.2, with Unique space code as identifier. |
+| BR-4: The system stores the list of facilities available in each space. | Captured by Facility entity and HAS_FACILITY many-to-many relationship. |
+| BR-5: Users can submit booking requests by selecting a space, requested start time, requested end time, purpose of use, and expected number of participants. | Captured by Booking Request attributes plus SUBMITS and SELECTS_SPACE relationships. |
+| BR-6: A booking may be for a lecture, examination, seminar, workshop, meeting, student activity, or administrative event. | Captured by Booking Request attribute Booking type. |
+| BR-7: Each booking request has a status such as pending, approved, rejected, cancelled, checked in, completed, or no-show. | Captured by Booking Request attribute Status; status-transition enforcement is not fully captured conceptually — enforcement deferred to logical/physical design. |
+| BR-8: The system must prevent conflicting bookings. | Represented as a cross-entity constraint involving Booking Request and Space; detailed conflict enforcement deferred to logical/physical design. |
+| BR-9: The same space cannot have two approved bookings with overlapping time periods. | Represented by Booking Request requested time attributes, Status, and SELECTS_SPACE relationship; overlap enforcement deferred to logical/physical design. |
+| BR-10: A space that is under maintenance, temporarily closed, or retired cannot be booked. | Represented by Space Current status and SELECTS_SPACE relationship; enforcement of disallowed statuses deferred to logical/physical design. |
+| BR-11: A booking request may require approval from a facility staff member or manager. | Captured by optional HAS_APPROVAL_DECISION relationship and MAKES_DECISION relationship to User. |
+| BR-12: When a booking is approved or rejected, the system records the staff member who made the decision, the decision time, and a decision note. | Captured by Approval Decision attributes Decision time and Decision note, plus MAKES_DECISION relationship. |
+| BR-13: If the booking is rejected, the rejection reason should be stored. | Captured by Approval Decision attribute Rejection reason. Conditional applicability for rejected decisions — enforcement deferred to logical/physical design. |
+| BR-14: When the requester arrives, facility staff can check in the booking. | Captured by HAS_USAGE_SESSION and CHECKED_IN_BY relationships. |
+| BR-15: At check-in, the system records the actual start time, the person who checked in the booking, and the initial condition of the space. | Captured by Usage Session attributes Actual start time and Initial condition of the space, plus CHECKED_IN_BY relationship. |
+| BR-16: When the session ends, facility staff can complete the booking. | Captured by distinct COMPLETED_BY relationship. |
+| BR-17: At completion, the system records the actual end time, the final condition of the space, and any usage notes. | Captured by Usage Session attributes Actual end time, Final condition of the space, and Usage notes. |
+| BR-18: A space may have maintenance records for problems such as broken projectors, air-conditioning failure, damaged furniture, cleaning issues, or network problems. | Captured by HAS_MAINTENANCE_RECORD relationship and Maintenance Record entity. |
+| BR-19: Each maintenance record stores the related space, reporter, assigned staff member, problem description, start time, completion time, status, and result note. | Captured by Maintenance Record attributes plus HAS_MAINTENANCE_RECORD, REPORTED_BY, and ASSIGNED_TO relationships. |
+| BR-20: A space under maintenance cannot be booked. | Represented by Space Current status and SELECTS_SPACE relationship; enforcement deferred to logical/physical design because the conceptual model does not define the operational mechanism. |
+| BR-21: The system should keep historical records of bookings and maintenance activities. | Supported by retaining Booking Request, Usage Session, Approval Decision, and Maintenance Record as event/history entities. |
+| BR-22: Staff should be able to view booking history, upcoming bookings, spaces under maintenance, and no-show bookings. | Supported by User, Booking Request, Space, and Maintenance Record entities and their relationships; access/view permission enforcement deferred to logical/physical design. |
 
 ## 6. Design Reasoning
 
-- `User` is modeled once because all actors are university account holders and differ mainly by role.
-- `Approval Decision` is separate from `Booking Request` because approval records have their own decision time, decision note, decision maker, and rejection reason.
-- `Usage Session` is separate from `Booking Request` because requested times and actual usage times are different business facts.
-- `Maintenance Record` is separate from `Space` because a space can have many maintenance events over time and the system must preserve maintenance history.
-- `Space` and `Facility` remain many-to-many because this is a conceptual design and the requirement explicitly says each space may have several facilities, while facility types can reasonably appear in multiple spaces.
-- The user who submits a booking, the user who makes an approval decision, the user who checks in a session, the user who completes a session, the user who reports maintenance, and the user assigned to maintenance are represented as separate relationships because they describe different business responsibilities.
+The conceptual model carries forward the seven entities from the upstream analysis: User, Space, Facility, Booking Request, Approval Decision, Usage Session, and Maintenance Record. Relationship-reference facts from the upstream analysis, such as selected space, decision staff member, check-in person, completion person, related space, reporter, and assigned staff member, are modeled as relationships rather than as attributes.
 
-## 7. Assumptions Carried Forward
+Approval Decision is kept separate from Booking Request because decision time, decision note, and rejection reason are facts about the approval/rejection event rather than general request details. Usage Session is kept separate from Booking Request because actual start/end times, space conditions, and usage notes are facts about actual use rather than requested use. Facility is modeled as a reusable facility type connected to Space through a many-to-many relationship, matching the upstream relationship row that a space may have several facilities and facility types may appear in multiple spaces.
 
-- Facility staff and facility managers are represented as roles of `User`.
-- A usage session exists only after a booking is checked in.
-- Maintenance assignment can be optional when a maintenance record is first reported.
-- Facility details beyond name or type remain unspecified at the conceptual level.
-- The open questions from `outputs/01-business-req-analysis-G03.md` remain unresolved and should be clarified before final logical design where necessary.
+Multiple relationships between the same entity pair are kept distinct in §4 because the roles are semantically different and may involve different users at different times. `CHECKED_IN_BY` and `COMPLETED_BY` both connect User to Usage Session, but the upstream analysis records the person who checked in separately from the completion action. `REPORTED_BY` and `ASSIGNED_TO` both connect User to Maintenance Record, but the upstream analysis identifies reporter and assigned staff member as different role-players. The Mermaid diagram merges each multi-relationship pair into one representative visual line only because Mermaid `erDiagram` rendering does not reliably display repeated lines between the same entity pair; §4 remains the authoritative relationship model.
+
+The design does not resolve upstream open questions. Booking cancellation and no-show transitions, maintenance status values, requester eligibility, special equipment requests, usage policy enforcement, maintenance assignment authority, and whether maintenance records automatically change space status remain outside the asserted conceptual constraints.
+
+## 7. Assumptions
+
+Every assumption must carry a source tag:
+- `[upstream]` — carried forward from the upstream analysis without change.
+- `[upstream-corrected]` — item from upstream that was modified here (e.g. duplicate attribute removed, identifier added). Must state what changed and why.
+- `[design-level]` — new assumption introduced at this stage, not present in upstream analysis.
+
+- [upstream] `Facility ID` is a proposed identifier for Facility because the upstream analysis lists facility examples and says to store facilities available in each space, but does not name a facility identifier.
+- [upstream] `Booking ID` is a proposed identifier for Booking Request because the upstream analysis describes booking requests but does not name a booking identifier.
+- [upstream] `Approval Decision ID` is a proposed identifier for Approval Decision because the upstream analysis describes recorded approval/rejection details but does not name a decision identifier.
+- [upstream] `Usage Session ID` is a proposed identifier for Usage Session because the upstream analysis describes check-in and completion records but does not name a usage-session identifier.
+- [upstream] `Maintenance Record ID` is a proposed identifier for Maintenance Record because the upstream analysis describes maintenance records but does not name a maintenance-record identifier.
+- [upstream] Approval Decision is modeled as a separate entity because the upstream analysis records decision-specific facts: decision maker, decision time, decision note, and rejection reason.
+- [upstream] Usage Session is modeled as a separate entity because the upstream analysis records actual usage facts at check-in and completion that are distinct from requested booking facts.
+- [upstream] `Decision note` and `rejection reason` are retained as distinct Approval Decision attributes because the upstream analysis names both; rejection reason applies when the booking is rejected.
+- [upstream] The generic word “Staff” in the staff-view requirement is interpreted as Facility Staff because the upstream analysis lists Facility Staff as a user role and does not list a separate generic Staff role.
+- [design-level] Attribute names in the Mermaid ERD use underscore formatting, such as `requested_start_time`, as visual equivalents of the source labels, such as “Requested start time”; the authoritative attribute labels are listed in §3.
+- [design-level] No duplicate business fact from upstream required removal in this conceptual design; `rejection reason` appears only on Approval Decision, consistent with the upstream analysis.
+
+## 8. Open Questions
+
+- Layer A mentions checking whether a requester is allowed to use a room; should the new system enforce requester eligibility? This could affect User-to-Booking Request permissions and Space usage constraints.
+- Layer A mentions checking whether special equipment is needed; should the new system record or validate requested equipment needs? This could require a relationship between Booking Request and Facility, but it is not modeled because Layer B does not state it.
+- Layer B stores a space usage policy, but does not say how it is enforced; should booking requests be validated against usage policy? Enforcement is not modeled as a definite constraint.
+- What action and role create the `cancelled` booking status, and from which statuses can cancellation occur? Cancellation transitions are not asserted in the conceptual model.
+- What action and role create the `no-show` booking status, and from which status can a booking become no-show? No-show transitions are not asserted in the conceptual model.
+- Can a booking move from pending directly to checked in if approval is not required, or does every checked-in booking first become approved? The conceptual model keeps HAS_USAGE_SESSION optional and does not assert this transition path.
+- Which user roles are allowed to report maintenance issues? The REPORTED_BY relationship records a reporter User, but role restriction is unresolved.
+- Which user roles are allowed to assign maintenance staff members? The ASSIGNED_TO relationship records an assigned User, but assignment authority is unresolved.
+- What maintenance status values are allowed, and what transitions are permitted from start time to completion time? Maintenance status is modeled as an attribute only; allowed values and transitions are unresolved.
+- Does creating an active maintenance record automatically set the related space status to under maintenance, or is the space status managed separately? The model includes both Space Current status and HAS_MAINTENANCE_RECORD but does not assert automatic synchronization.
+- Does every approved or rejected booking require exactly one Approval Decision record, including bookings that do not require approval? The conceptual model uses optional HAS_APPROVAL_DECISION as specified upstream.
+- BR-7 status-transition enforcement deferred to logical/physical design because the upstream analysis lists statuses but does not define all transitions.
+- BR-8 and BR-9 booking conflict/overlap enforcement deferred to logical/physical design because the conceptual ERD can represent the involved entities and attributes but not the full temporal conflict rule.
+- BR-10 and BR-20 unavailable-space booking enforcement deferred to logical/physical design because the conceptual ERD can represent Space Current status but not the operational validation mechanism.
+- BR-13 conditional rejection-reason enforcement deferred to logical/physical design because the conceptual ERD stores the fact but does not enforce conditional applicability.
+- BR-22 staff view/access enforcement deferred to logical/physical design because the conceptual ERD represents the information to view but not access-control behavior.

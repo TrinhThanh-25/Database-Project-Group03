@@ -1,0 +1,6 @@
+2026-06-25 08:37:45 +07 — Reviewed draft against Layer B grounding, actor de-duplication, attribute/reference separation, distinct check-in/completion relationships, and process-level completeness. Moved Layer-A-only or ambiguous items to Open Questions rather than asserting them as rules.
+2026-06-25 08:37:45 +07 — Adjusted requester actor responsibility wording to be role-specific for the actor consistency blocking check while preserving the Layer B role list.
+2026-06-25 08:37:45 +07 — Tightened unavailable-space cross-entity wording to avoid adding unstated create/approve enforcement mechanics.
+2026-06-25 08:49:40 +07 — Reviewed conceptual design against upstream entity attributes, relationship completeness, bidirectional participation, multi-relationship role separation, and open-question carry-forward. Confirmed Mermaid merged duplicate entity-pair lines only visually while §4 remains authoritative.
+2026-06-25 08:49:40 +07 — Tightened business rule coverage wording to explicitly mark deferred enforcement as deferred to logical/physical design where required by the conceptual designer instructions.
+2026-06-25 08:49:40 +07 — Clarified COMPLETED_BY participation so an in-progress usage session is not forced to have a completion person before completion occurs.
