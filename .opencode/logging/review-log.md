@@ -22,3 +22,8 @@
 
 2026-06-25 13:50:00 +07 — Reviewed SQL query design against actual DDL and sample data to ensure table/column names are valid and queries answer realistic business questions for students, lecturers, facility staff, department administrators, and facility managers.
 2026-06-25 13:50:00 +07 — Confirmed output contains ten meaningful read-only SELECT queries with joins, filters, grouping, aggregation, ordering, and required explanatory comments.
+## 2026-06-26 - Review notes for Fix 6
+
+- Addressed report items F6-01 through F6-05 in agent/template/rubric guidance.
+- Addressed F6-06 by requiring either a documented clean-schema execution assumption or explicit idempotency when requested.
+- Did not modify `outputs/06-sample-data-G03.sql` because the user requested fixing the agent/docs so OpenCode can regenerate the correct output. 
