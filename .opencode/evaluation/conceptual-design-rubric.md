@@ -16,6 +16,8 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 | A2 | Every relationship in the conceptual design is represented with appropriate cardinalities and participation constraints as specified in the business requirements analysis document | For each relationship, confirm that the cardinality and participation constraints match the source text |
 | A3 | Every entity, attribute, and relationship in the conceptual design traces to a specific item in the business requirements analysis document | For each entity, attribute, and relationship, confirm that it can be traced back to a specific item in the source document |
 | A4 | No invented entities, attributes, relationships, cardinalities, or constraints are present in the conceptual design | Confirm that all elements in the design are supported by the source document and that no additional elements have been added |
+| A5 | §4 Cardinality column uses a uniform A→B orientation on every row | Read the `Cardinality` value of each row against its `Entity A` / `Entity B` columns. FAIL if any row flips the order (e.g. an Entity-A=User row reading `0..* to 0..1` while sibling User rows read `1 to 0..*`), even when the prose direction is correct. |
+| A6 | Mermaid diagram cardinality symbols agree with §4 | For each relationship, confirm the Mermaid symbol's optional/mandatory and one/many sides match the §4 participation text. |
 
 ## B. Workflow and Relationship between Entities (Blocking) — corresponds to Workflow steps 7–8
 
@@ -38,7 +40,7 @@ Run date: [date]
 Run time: [time]
 Run by: [agent / human reviewer]
 
-A1-A4: [PASS/FAIL each] — [note]
+A1-A6: [PASS/FAIL each] — [note]
 B1-B2: [PASS/FAIL each] — [note]
 C1: [PASS/FAIL] — [note]
 

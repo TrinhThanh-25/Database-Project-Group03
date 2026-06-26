@@ -6,18 +6,18 @@ Review and validate the business requirement analysis, conceptual database desig
 
 ## Agent
 
+Use the agent defined in `.opencode/agent/database-design-reviewer.md`. That file owns the full workflow (how to read input, extract, validate, and self-check) — this command only defines the contract: what goes in, what comes out, and where to find the supporting files.
+
+## Contract
+
 Before producing the output:
 1. Read and follow the agent definition from:
    `.opencode/agent/database-design-reviewer.md`
-2. Use the official validation report template.
-3. Use the validation rubric to evaluate the design.
-4. Base every finding on evidence from the reviewed artifacts.
-
-## Aliases
-
-* /validate-design
-* /database-design-review
-* /design-review
+2. Read and follow the structural template from:
+   `.opencode/templates/validation-template.md`
+3. After drafting the output, run the self-check against:
+   `.opencode/evaluation/validation-rubric.md`
+   The output must pass ALL "blocking" checks in the rubric before being written to the final output path. If any blocking check fails, fix the draft and re-run the self-check. Do not deliver a draft that fails a blocking check; if a check cannot be resolved, document it under "Open Questions" instead of silently dropping it.
 
 ## Required Inputs
 
@@ -36,54 +36,3 @@ Inputs must be reviewed in the following order:
 
 * Database Design Validation Report: `outputs/04-design-validation-G03.md`.
 
-## Validation Focus
-
-The reviewer must validate:
-
-- Requirement coverage
-- Entity completeness
-- Attribute completeness
-- Relationship correctness
-- Cardinality
-- Participation constraints
-- Primary keys
-- Foreign keys
-- Candidate keys
-- Business rule coverage
-- Constraint feasibility
-- SQL implementation risks
-
-## Execution Rules
-
-- Do not redesign the database.
-- Do not introduce new business requirements.
-- Do not modify previous outputs.
-- Validate only the submitted artifacts.
-- Every issue must include:
-  - severity
-  - evidence
-  - recommendation
-
-## Deliverable Quality
-
-The report should be:
-
-- Objective
-- Evidence-based
-- Traceable to the reviewed documents
-- Actionable
-- Suitable for database implementation review
-
-## Evaluation
-
-Use:
-
-.opencode/evaluation/validation-rubric.md
-
-to evaluate the completeness, correctness, consistency, and requirement coverage of the submitted design.
-
-## Template
-
-Generate the report using:
-
-.opencode/skills/db-design-pipeline/templates/validation-template.md

@@ -18,72 +18,183 @@ These rules exist specifically because past output violated them. Apply all of t
 
 ### Rule 1 — Attribute and relationship completeness on every entity
 
-For every entity, ensure that all attributes are included in the conceptual design. If a non-relationship business attribute is mentioned in the analysis document, it must be represented in the conceptual design. Relationship-reference attributes must be converted into relationships, not copied into entity attribute lists. Relationship links between entities must also be represented as relationships in the conceptual design, with appropriate cardinalities and participation constraints.
+#### 1. Core Principle
 
-- Build the attribute list for each entity directly from the corresponding entity definition in the analysis document (section "Main Entities and Attributes"). Do not drop, rename, or merge attributes silently.
+For every entity, ensure that all attributes are included in the conceptual design. Non-relationship business attributes mentioned in the analysis must be represented; relationship-reference attributes must be converted into relationships, not copied into attribute lists. Relationship links between entities must also be represented as relationships, with appropriate cardinalities and participation constraints.
+
+#### 2. Building the Attribute List
+
+- Build the attribute list for each entity directly from the corresponding entity definition in the analysis document (section "Main Entities and Attributes").
+- Do not drop, rename, or merge attributes silently.
+
+#### 3. Descriptive Attributes Must Appear
+
 - A descriptive (non-relationship) attribute that appears in the source — e.g. decision time, decision note, actual start time, initial condition, problem description, result note — must appear verbatim (or as a clearly equivalent label) in the entity's attribute list.
-- If you choose a label different from the source wording, that is acceptable only if the meaning is unchanged; note the equivalence is intentional in the traceability section.
-- If a relationship is mentioned in the source, it must appear in the design as a relationship with cardinality and participation constraints that match the source. Do not silently drop or merge relationships.
-- *Identifier requirement*: Every entity in the conceptual ERD must have exactly one identifier attribute (conceptual primary key). Apply in this order:
-    1. If the upstream analysis names an identifier (e.g. `user_id`, `space_code`, `booking_request_id`, `maintenance_record_id`), use it.
-    2. If the upstream analysis does not name one, propose a surrogate identifier using the pattern `[entity_name]_id` (e.g. `decision_id`, `session_id`, `facility_id`), include it in the entity's attribute block, and record it as an Assumption: "`[entity]_id: surrogate identifier proposed at conceptual design stage — not named in upstream analysis.`"
-    3. An entity with no identifier is incomplete and blocks delivery.
+- If you choose a label different from the source wording, that is acceptable only if the meaning is unchanged; note the intentional equivalence in the traceability section.
 
+#### 4. Relationships Must Be Preserved
+
+If a relationship is mentioned in the source, it must appear in the design as a relationship with cardinality and participation constraints that match the source. Do not silently drop or merge relationships.
+
+#### 5. Identifier Requirement
+
+Every entity in the conceptual ERD must have exactly one identifier attribute (conceptual primary key). Apply in this order:
+
+1. If the upstream analysis names an identifier (e.g. `user_id`, `space_code`, `booking_request_id`, `maintenance_record_id`), use it.
+2. If the upstream analysis does not name one, propose a surrogate identifier using the pattern `[entity_name]_id` (e.g. `decision_id`, `session_id`, `facility_id`), include it in the entity's attribute block, and record it as an Assumption: `"[entity]_id: surrogate identifier proposed at conceptual design stage — not named in upstream analysis."`
+3. An entity with no identifier is incomplete and blocks delivery.
+
+> Stage boundary note: the conceptual identifier here is the **natural/business identifier** (the value the business uses to recognize a row, e.g. a student code or space code). Choosing the physical key *type* — specifically standardizing every table's primary key to a surrogate `INT` and demoting the natural identifier to a `UNIQUE` business attribute — is a logical/physical-stage decision (per Rule 6 Stage Boundary), handled by the logical database designer. Do not introduce `INT IDENTITY` surrogate keys at the conceptual stage; just identify the natural identifier so the logical stage can map it consistently.
+
+---
 
 ### Rule 2 — Distinct role-players must be distinguishable
 
-Where two references on the same entity may point to different people, the model must keep them separate (two distinct relationships). In particular:
+#### 1. Core Principle
 
+Where two references on the same entity may point to different people, the model must keep them separate (two distinct relationships).
 
-- USAGE_SESSION: checked in by and completed by are two separate roles that can be different users. Model them as two distinct relationships (e.g. CHECKED_IN_BY, COMPLETED_BY), each User (1) — (0..*) Usage Session. A single generic "handled by" relationship is not acceptable.
-- MAINTENANCE_RECORD: reporter and assigned staff member are two separate roles; model them separately.
+#### 2. Required Cases
+
+- **USAGE_SESSION**: "checked in by" and "completed by" are two separate roles that can be different users. Model them as two distinct relationships (e.g. `CHECKED_IN_BY`, `COMPLETED_BY`), each User (1) — (0..*) Usage Session. A single generic "handled by" relationship is **not** acceptable.
+- **MAINTENANCE_RECORD**: "reporter" and "assigned staff member" are two separate roles; model them separately.
+
+---
 
 ### Rule 3 — No invented elements
 
-- Do not add entities, attributes, relationships, cardinalities, or constraints that the analysis document does not support.
-- Do not promote an "Open Question" or an unstated rule into a modelled constraint. If the analysis document marks something as unspecified (e.g. maintenance status values, who may cancel, whether an active maintenance record flips space status), it stays out of the model and is carried into this document's "Open Questions".
+#### 1. Core Principle
 
-- **Invented attribute detection**: After writing every entity's attribute list, scan for any attribute that does NOT appear verbatim or as a clear equivalent in the upstream analysis document's entity definition. For each such attribute found:
-    - If it is a proposed identifier (per Rule 1 identifier requirement): record as Assumption.
-    - If it is any other attribute: it is an invented element and must be removed unless you can cite the exact sentence in the upstream analysis that supports it. Record removed attributes in §7 Assumptions with the note: `"[Attribute] on [Entity] was removed — not traceable to upstream analysis."`
-Concrete example: `facility_description` on `FACILITY` — if the upstream analysis only states `facility_name_or_type`, then `facility_description` is an invented element and must be removed or explicitly justified.
+- Do not add entities, attributes, relationships, cardinalities, or constraints that the analysis document does not support.
+- Do not promote an "Open Question" or an unstated rule into a modelled constraint. If the analysis marks something as unspecified (e.g. maintenance status values, who may cancel, whether an active maintenance record flips space status), it stays out of the model and is carried into this document's "Open Questions".
+
+#### 2. Invented Attribute Detection
+
+After writing every entity's attribute list, scan for any attribute that does NOT appear verbatim or as a clear equivalent in the upstream analysis's entity definition. For each such attribute:
+
+| Case | Action |
+|---|---|
+| It is a proposed identifier (per Rule 1) | Record as Assumption |
+| It is any other attribute | It is an invented element — remove it unless you can cite the exact upstream sentence supporting it |
+
+Record removed attributes in §7 Assumptions with the note: `"[Attribute] on [Entity] was removed — not traceable to upstream analysis."`
+
+#### 3. Concrete Example
+
+`facility_description` on `FACILITY` — if the upstream analysis only states `facility_name_or_type`, then `facility_description` is an invented element and must be removed or explicitly justified.
+
+---
 
 ### Rule 3.1 — Upstream duplication detection
-Before finalising any entity's attribute list, check every attribute against every other entity for duplication. Specifically: if the same real-world fact appears as an attribute on two different entities, you must resolve the duplication before delivering the design — even if the upstream analysis document contained the duplication.
 
-Resolution procedure:
-- Identify which entity is the authoritative "event record" for that fact (prefer the entity that records the decision/event over the entity that is acted upon).
-- Remove the attribute from the non-authoritative entity.
-- Record the removal as an Assumption with the format: "[Attribute] was present on [Entity A] in the upstream analysis but moved exclusively to [Entity B], which is the authoritative record of this fact. Flagged as upstream analysis error."
+#### 1. Core Principle
 
-Concrete example: `rejection_reason` belongs on `APPROVAL_DECISION` (the decision record), not on `BOOKING_REQUEST` (the entity being decided upon). If the upstream analysis placed it on both, remove it from `BOOKING_REQUEST` and note the correction.
-This rule takes precedence over Rule 1 (attribute completeness from source) when a conflict arises. Rule 1 says "do not drop attributes silently" — this rule says "drop duplicates explicitly and document the drop."
+Before finalising any entity's attribute list, check every attribute against every other entity for duplication. If the same real-world fact appears as an attribute on two different entities, resolve the duplication before delivering — even if the upstream analysis contained the duplication.
+
+#### 2. Resolution Procedure
+
+1. Identify which entity is the authoritative "event record" for that fact (prefer the entity that records the decision/event over the entity that is acted upon).
+2. Remove the attribute from the non-authoritative entity.
+3. Record the removal as an Assumption: `"[Attribute] was present on [Entity A] in the upstream analysis but moved exclusively to [Entity B], which is the authoritative record of this fact. Flagged as upstream analysis error."`
+
+#### 3. Concrete Example
+
+`rejection_reason` belongs on `APPROVAL_DECISION` (the decision record), not on `BOOKING_REQUEST` (the entity being decided upon). If the upstream analysis placed it on both, remove it from `BOOKING_REQUEST` and note the correction.
+
+#### 4. Precedence
+
+This rule takes precedence over Rule 1 when a conflict arises. Rule 1 says "do not drop attributes silently"; this rule says "drop duplicates explicitly and document the drop."
+
+---
 
 ### Rule 4 — Traceability
 
+#### 1. Core Principle
+
 Every entity, attribute, and relationship in the design must trace to a specific item in the analysis document (entity definition, relationship row, or business rule).
-Cardinality and participation for each relationship must match the analysis document's "Relationships and Cardinalities" section. Where the source says "zero or one" model optional participation; where it says "one … to many" model accordingly.
-Bidirectional participation: For every relationship in §4, the Participation column and Explanation column must describe both directions:
-    - Direction A→B: "Each [A] is associated with [zero/one/many] [B]."
-    - Direction B→A: "Each [B] must be associated with [exactly one / zero or one] [A]."
-Example for Booking Request → Approval Decision:
-    - A→B: "A booking request may have zero or one approval decision."
-    - B→A: "An approval decision must belong to exactly one booking request."
+
+#### 2. Cardinality Matching
+
+Cardinality and participation for each relationship must match the analysis document's "Relationships and Cardinalities" section. Where the source says "zero or one," model optional participation; where it says "one … to many," model accordingly.
+
+#### 3. Bidirectional Participation
+
+For every relationship in §4, the Participation and Explanation columns must describe **both** directions:
+
+- Direction A→B: "Each [A] is associated with [zero/one/many] [B]."
+- Direction B→A: "Each [B] must be associated with [exactly one / zero or one] [A]."
+
+**Example — Booking Request → Approval Decision:**
+- A→B: "A booking request may have zero or one approval decision."
+- B→A: "An approval decision must belong to exactly one booking request."
+
 A participation description that only explains one direction is incomplete.
 
+#### 4. Cardinality Notation Order Must Be Uniform
+
+In §4 the `Cardinality` column must always be written in the same order as the `Entity A` and `Entity B` columns of that row: Entity-A-side symbol first, then Entity-B-side symbol (e.g. `1 to 0..*` means A=1, B=0..*). Every row must follow this orientation. Do not flip the order on individual rows (e.g. writing `0..* to 0..1` for a `COMPLETED_BY` row whose Entity A is `User`, while every other `User`-anchored row reads `1 to 0..*`). A flipped row is still readable from its prose but breaks table-wide consistency and invites misreading — it is a defect even when the prose is correct. Before delivery, scan the column and confirm a single, consistent A→B orientation across all rows.
+
+---
 
 ### Rule 5 — Ambiguity handling
 
 If any ambiguity arises in the analysis document, do not guess. Record it under "Open Questions" and carry forward (do not silently resolve) any open question already raised upstream that affects the model.
 
+---
+
 ### Rule 6 — Relationships must not be modelled as attributes
+
+#### 1. Core Principle
 
 In a Conceptual ERD, an attribute must represent a business property of an entity.
 
+#### 2. Prohibition
+
 Do not model as attributes any values whose sole purpose is to reference, identify, assign, select, or associate another entity. Such connections must be represented as relationships with appropriate cardinalities and participation constraints.
+
+#### 3. Stage Boundary
 
 Foreign keys and relationship-reference attributes belong to the Logical Database Design and Physical Database Design stages, not the Conceptual Database Design stage.
 
+### Rule 7 — One line per relationship in the ERD diagram
+
+#### 1. Core Principle
+
+Every distinct relationship (including every distinct foreign-key reference) must be drawn as its own separate line in the Mermaid ERD. The number of lines in the diagram between any two entities must equal the number of distinct relationships listed for that entity pair in §4 Relationship Constraints. Never merge two or more distinct relationships into a single representative line.
+
+#### 2. Multiple References to the Same Entity
+
+When one entity references another entity more than once (two or more distinct roles), each reference is drawn as its own line with its own role label — not collapsed into one line.
+
+**Required examples:**
+- `USER` → `USAGE_SESSION`: draw **two** lines — `checks_in` and `completes`.
+- `USER` → `MAINTENANCE_RECORD`: draw **two** lines — `reports` and `is_assigned_to`.
+
+**Correct Mermaid syntax** (multiple labelled relationships between the same pair are fully supported):
+```mermaid
+USER ||--o{ USAGE_SESSION : checks_in
+USER ||--o{ USAGE_SESSION : completes
+USER ||--o{ MAINTENANCE_RECORD : reports
+USER ||--o{ MAINTENANCE_RECORD : is_assigned_to
+```
+
+#### 3. Prohibited Justification
+
+Do not claim that Mermaid `erDiagram` cannot display repeated lines between the same entity pair — this is false. The "one representative line" simplification, and any reasoning that depends on it, is forbidden. The diagram and §4 must agree on the relationship count.
+
+#### 4. Cardinality Symbols Must Match the Participation Text
+
+Each relationship line's Mermaid cardinality symbol must accurately reflect the participation described in §4. Distinct relationships with different participation must use different symbols — they must not share an identical symbol while the prose alone carries the distinction.
+
+**Required example — `USER` ↔ `USAGE_SESSION`:**
+- `CHECKED_IN_BY`: mandatory on the session side (every usage session has exactly one check-in user) → `USER ||--o{ USAGE_SESSION`.
+- `COMPLETED_BY`: optional until completion (a session may have zero or one completing user) → `USER |o--o{ USAGE_SESSION`.
+
+If the diagram symbol and the §4 participation text disagree, the diagram is incorrect.
+
+#### 5. Final Check
+
+Before delivery, count the relationship lines in the diagram and confirm the total equals the number of rows in §4. Any mismatch means a relationship was silently merged or dropped, and must be fixed.
 
 ## Workflow
 1. Read the business requirements analysis document and understand the entities, attributes, relationships, cardinalities, and participation constraints.

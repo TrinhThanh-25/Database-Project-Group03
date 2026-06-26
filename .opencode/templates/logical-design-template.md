@@ -18,7 +18,10 @@ Conventions:
 - SQL Server data types are logical recommendations and may be refined during physical implementation.
 - `NOT NULL` is used where the upstream conceptual design and business rules require the fact to exist at row creation.
 - Nullable columns must be justified as optional, lifecycle-dependent, or unresolved.
-- Do not add unsupported unique constraints or allowed-value CHECK constraints.
+- Do not add unsupported unique constraints or allowed-value CHECK constraints. In particular, do not add UNIQUE to a many-side (`0..*`) FK such as `APPROVAL_DECISION.booking_id` unless an explicit requirement forces one row per parent.
+- Every table's primary key is a surrogate `INT` (`INT IDENTITY`). Any conceptual natural identifier (e.g. `user_id` student code, `unique_space_code`) is demoted to a regular attribute protected by a named `UNIQUE` constraint, and every foreign key references the parent's surrogate `INT` PK. State the surrogate-key reasoning once (storage/join efficiency and stability — natural-key corrections need no cascade because nothing FK-references them).
+- Every `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, and `CHECK` constraint is named. Any conditional rule that is expressible as a single-row CHECK is written as a named CHECK (e.g. the rejected-reason rule), not left in prose.
+- Every `FOREIGN KEY` declares an explicit `ON DELETE` and `ON UPDATE` action chosen by a consistent, documented criterion (state the criteria once, e.g. in a §2.0 subsection: junction associations `CASCADE` on delete; references to historical/master data `NO ACTION`/RESTRICT on delete; `ON UPDATE NO ACTION` uniformly, since all PKs are immutable `INT` surrogates).
 
 ### 2.1 `[TABLE_NAME]`
 
@@ -28,11 +31,11 @@ Conventions:
 |---|---:|---:|---|---|
 | `[column_name]` | `[SQL Server type]` | `[NOT NULL/NULL]` | `[PK/FK/CHECK/UNIQUE/note]` | `[Conceptual attribute / relationship / BR ref]` |
 
-Primary key:
-- `CONSTRAINT [PK_NAME] PRIMARY KEY ([column])`
+Primary key (surrogate `INT IDENTITY`):
+- `CONSTRAINT [PK_NAME] PRIMARY KEY ([surrogate_int_id_column])`
 
 Foreign keys:
-- `CONSTRAINT [FK_NAME] FOREIGN KEY ([column]) REFERENCES [PARENT_TABLE]([parent_column])`
+- `CONSTRAINT [FK_NAME] FOREIGN KEY ([column]) REFERENCES [PARENT_TABLE]([parent_column]) ON DELETE [action] ON UPDATE [action]` — `[criterion/reasoning for the chosen actions]`
 
 Uniqueness constraints:
 - `CONSTRAINT [UQ_NAME] UNIQUE ([column])`
@@ -111,7 +114,9 @@ This section is optional in the user-facing output only if the project owner req
 
 - Entity-to-table coverage: `[PASS/FAIL]`
 - Attribute coverage: `[PASS/FAIL]`
-- Relationship mapping: `[PASS/FAIL]`
-- Key and constraint naming: `[PASS/FAIL]`
+- Surrogate `INT` PK standardization (natural keys demoted to named UNIQUE; FKs reference surrogate): `[PASS/FAIL]`
+- Relationship mapping (many-side FKs left non-unique): `[PASS/FAIL]`
+- Key and constraint naming (no prose-only in-row rule): `[PASS/FAIL]`
+- FK referential actions (explicit, consistently reasoned): `[PASS/FAIL]`
 - Business rule classification: `[PASS/FAIL]`
 - Assumptions/open questions: `[PASS/FAIL]`

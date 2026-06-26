@@ -28,6 +28,7 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 | B3 | No fact is listed as an attribute on two different entities | Search the whole document for repeated attribute names/concepts across entities |
 | B4 | Rejection reason appears only on Approval Decision, not on Booking Request | Check every entity's attribute list by name; confirm rejection reason (or equivalent) appears only in the Approval Decision entity, not in the Booking Request entity |
 | B5 | Terminology consistency check: No two different names are used for the same real-world concept | Scan the entire draft for any case where the same real-world concept is referred to by two different names (e.g., "closed" vs "temporarily closed", "manager", vs "facility manager", "staff" vs "facility staff") |
+| B6 | Every inferred/proposed element is labeled consistently | Scan every attribute, identifier, and derived value. Any element the source does not state as a literal stored fact (proposed surrogate keys, AND derived values such as `decision_outcome` extracted from a conditional like "approved or rejected") carries a visible inference tag and a matching Assumption. FAIL if any inferred element is added without the tag while others carry it. |
 
 
 
@@ -53,6 +54,7 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 |---|---|---|
 | E1 | Section 7 (State Transitions) is present and non-empty for at least Booking Request | At least one transition table with real content, not a placeholder |
 | E2 | Every state transition in Section 7 marked as definite is clearly implied by Layer B's described sequence | Ambiguous transitions are listed in Open Questions, not asserted |
+| E2a | Cancelled / No-show transitions are not asserted as definite | `Cancelled` and `No-show` appear in the allowed status *values*, but no `... → cancelled` / `... → no-show` transition is asserted as definite. Their missing trigger/role is carried as a scoped Open Question (Business Workflow / application-layer), and this is treated as correct handling, not a data-modeling gap to fix |
 | E3 | Section 8 (Role Permissions) is present and covers at least: submit booking, approve/reject, check in, complete, report maintenance | All five rows present |
 | E4 | Section 9 (Workflow Narratives) covers at least the booking lifecycle and the maintenance lifecycle | Both narratives present |
 | E5 | Section 10 (Cross-Entity Constraints) is present, even if its content is mostly "ambiguous, see Open Questions" | Section exists and is not silently omitted |
@@ -78,6 +80,9 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 |---|---|---|
 | H1 | No SQL, no table/column definitions, no data types anywhere in the document | Search for `CREATE TABLE`, `VARCHAR`, `PRIMARY KEY`, etc. — none should appear |
 | H2 | Document stays at conceptual/business level throughout | Spot-check Section 4 and 6 for implementation-level language |
+| H3 | No front-end or back-end implementation details or use cases are asserted as business rules, entity attributes, relationships, or cross-entity constraints | Spot-check Sections 4, 5, 6, 7, 8, 9, and 10. Frontend/backend/authorization/workflow ambiguities may appear in Section 13 only; they must not be asserted as facts or requirements elsewhere unless directly grounded in Layer B and relevant to database analysis. |
+| H4 | Every Section 13 Open Question has an explicit scope field | Each Open Question must use `Question: ... — Scope: ...` and the scope must be one of `Database`, `Backend`, `Frontend`, `Authorization`, `Business Workflow`, `Mixed`, or `Other`. |
+| H5 | Section 13 Open Questions are correctly scoped and not silently treated as database requirements | Spot-check every Open Question. Backend, Frontend, Authorization, and Business Workflow questions are allowed, but they must be labeled accurately and must not be used as asserted database constraints unless separately grounded in Layer B. |
 
 ## I. Self-Check Execution Log (write to `.opencode/logging/self-check-log.md`)
 
@@ -95,13 +100,13 @@ Run time: [time]
 Run by: [agent / human reviewer]
 
 A1-A2: [PASS/FAIL each] — [note]
-B1-B5: [PASS/FAIL each] — [note]
+B1-B6: [PASS/FAIL each] — [note]
 C1-C2: [PASS/FAIL each] — [note]
 D1-D4: [PASS/FAIL each] — [note]
-E1-E6: [PASS/FAIL each] — [note]
+E1-E6 (incl. E2a): [PASS/FAIL each] — [note]
 F1-F2: [PASS/FAIL each] — [note]
 G1-G2: [PASS/FAIL each] — [note]
-H1-H2: [PASS/FAIL each] — [note]
+H1-H5: [PASS/FAIL each] — [note]
 I1: [PASS/FAIL] — [note]
 
 Blocking failures remaining: [list, or "none"]

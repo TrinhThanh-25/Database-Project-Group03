@@ -22,8 +22,65 @@
 
 2026-06-25 13:50:00 +07 — Reviewed SQL query design against actual DDL and sample data to ensure table/column names are valid and queries answer realistic business questions for students, lecturers, facility staff, department administrators, and facility managers.
 2026-06-25 13:50:00 +07 — Confirmed output contains ten meaningful read-only SELECT queries with joins, filters, grouping, aggregation, ordering, and required explanatory comments.
-## 2026-06-26 - Review notes for Fix 6
 
-- Addressed report items F6-01 through F6-05 in agent/template/rubric guidance.
-- Addressed F6-06 by requiring either a documented clean-schema execution assumption or explicit idempotency when requested.
-- Did not modify `outputs/06-sample-data-G03.sql` because the user requested fixing the agent/docs so OpenCode can regenerate the correct output. 
+2026-06-25 16:49:27 +07 — Reviewed business requirement analysis against Layer B grounding, actor de-duplication, attribute/reference separation, explicit approval decision outcome, and distinct check-in/completion relationships.
+2026-06-25 16:49:27 +07 — Moved usage policy enforcement, maintenance transitions, cancellation/no-show transitions, reporter/assignment role scope, capacity comparison, and status-causality questions to Open Questions rather than asserting unstated rules.
+
+2026-06-25 17:09:04 +07 — Reviewed business analyst constraints and requirement-analysis rubric for the backend/database Open Question conflict; added scope labeling instead of banning backend/frontend/authorization ambiguity from Open Questions.
+
+2026-06-25 17:13:41 +07 — Reviewed the regenerated business requirement analysis against Layer B grounding, actor de-duplication, attribute/reference separation, explicit approval decision outcome, and distinct check-in/completion relationships.
+2026-06-25 17:13:41 +07 — Kept usage-policy enforcement, cancellation/no-show transitions, maintenance status lifecycle, reporter/assignment permissions, capacity comparison, and maintenance-space status causality as scoped Open Questions rather than asserted rules.
+
+2026-06-25 17:24:28 +07 — Reviewed conceptual design for entity/attribute completeness, duplicate fact avoidance, relationship-reference removal from attributes, distinct check-in/completion relationships, and distinct reporter/assigned-staff relationships.
+2026-06-25 17:24:28 +07 — Confirmed §4 participation descriptions are bidirectional and that Mermaid relationship-line count matches the relationship-constraint table count.
+
+2026-06-25 17:39:01 +07 — Reviewed logical schema against conceptual design for entity/table coverage, exact attribute propagation, relationship FK mapping, M:N junction resolution, and unique FK handling for approval decision and usage session.
+2026-06-25 17:39:01 +07 — Reviewed guardrails: no `FACILITY.facility_description`, no duplicate booking-level rejection reason, no unsupported unique constraints on email/facility/space names, and no unsupported CHECK constraints for account status, space type, or maintenance status.
+2026-06-25 17:39:01 +07 — Reviewed business-rule classification for approved-booking overlap, unavailable-space booking prevention, decision/check-in/completion role restrictions, conditional rejection reason, maintenance status ambiguity, and participant-capacity comparison.
+
+2026-06-25 17:42:48 +07 — Reviewed submitted analysis, conceptual ERD, and logical schema against the original Facility Manager requirements; found complete coverage of core entities, attributes, relationships, PKs, FKs, and evidence-based CHECK constraints.
+2026-06-25 17:42:48 +07 — Identified implementation conditions for overlap prevention, unavailable-space booking prevention, role restrictions, conditional rejection reason, completion consistency, and maintenance/status lifecycle clarification.
+2026-06-25 17:42:48 +07 — Assigned final validation decision `ACCEPTED WITH CONDITIONS` because the design is structurally sound but important business rules must be enforced during implementation.
+
+2026-06-25 18:45:31 +07 — Reviewed the business requirement analysis against Layer B grounding, actor de-duplication, attribute/reference separation, single-source-of-truth for rejection reason, explicit derived decision outcome, and distinct check-in/completion relationships.
+2026-06-25 18:45:31 +07 — Kept usage-policy enforcement, cancellation/no-show transitions, maintenance status lifecycle, reporter/assignment permissions, staff-view scope, history retention, and maintenance-space status causality as scoped Open Questions rather than asserted rules.
+
+2026-06-25 18:53:56 +07 — Reviewed conceptual design for entity/attribute completeness, no duplicated rejection reason, no relationship references in attribute lists, and no unsupported facility description or extra status entity.
+2026-06-25 18:53:56 +07 — Reviewed relationship constraints for bidirectional participation, uniform A→B cardinality orientation, distinct check-in/completion roles, distinct reporter/assigned-staff roles, and Mermaid/§4 line-count agreement.
+2026-06-25 18:53:56 +07 — Carried forward all upstream open questions that affect the conceptual model instead of asserting unstated lifecycle, authorization, retention, or status-synchronization rules.
+
+2026-06-25 19:03:52 +07 — Reviewed logical schema against conceptual design for entity/table coverage, exact attribute propagation, relationship FK mapping, M:N junction resolution, and role-playing FK naming.
+2026-06-25 19:03:52 +07 — Reviewed guardrails: no `FACILITY.facility_description`, no booking-level `rejection_reason`, FK/PK type-length matches for `NVARCHAR(50)` natural keys, email candidate key is unique, and no unsupported uniqueness on space/facility names.
+2026-06-25 19:03:52 +07 — Reviewed business-rule classification for approved-booking overlap, unavailable-space booking prevention, role restrictions, conditional rejection reason, maintenance/status ambiguity, participant-capacity comparison, and lifecycle open questions.
+
+2026-06-25 19:13:23 +07 — Reviewed requirement analysis, conceptual ERD, and logical schema against the original Facility Manager requirements; found complete core coverage and strong traceability across stages.
+2026-06-25 19:13:23 +07 — Verified logical FK/PK data-type matching, email candidate-key uniqueness, absence of unsupported facility description/booking-level rejection reason, in-row start/end CHECK constraints, and nullable note fields.
+2026-06-25 19:13:23 +07 — Identified conditions before implementation: confirm approval-decision uniqueness, add or explicitly defer rejected-reason conditional CHECK, implement overlap/unavailable-space/role restrictions, and clarify maintenance/status lifecycle questions.
+2026-06-25 19:13:23 +07 — Assigned final validation decision `ACCEPTED WITH CONDITIONS`.
+
+2026-06-26 11:33:14 +07 — Reviewed the regenerated business requirement analysis against Layer B grounding, actor de-duplication, attribute/reference separation, single-source-of-truth for rejection reason, explicit tagged decision outcome, and distinct check-in/completion relationships.
+2026-06-26 11:33:14 +07 — Kept usage-policy enforcement, cancellation/no-show transitions, approval-required criteria, maintenance status lifecycle, maintenance role permissions, staff-view scope, capacity comparison, account-status values, and maintenance-space status causality as scoped Open Questions rather than asserted business rules.
+2026-06-26 11:33:14 +07 — Tightened requester actor descriptions to avoid implying a source-unstated mapping between specific user roles and booking purpose values.
+
+2026-06-26 11:45:30 +07 — Reviewed conceptual design for entity/attribute completeness, no duplicated rejection reason, no relationship references in attribute lists, and no unsupported facility description, status entity, or purpose entity.
+2026-06-26 11:45:30 +07 — Reviewed relationship constraints for bidirectional participation, uniform A→B cardinality orientation, distinct check-in/completion roles, distinct reporter/assigned-staff roles, and Mermaid/§4 line-count agreement.
+2026-06-26 11:45:30 +07 — Carried forward upstream open questions and added conceptual enforcement deferrals for overlap prevention, unavailable-space booking prevention, and conditional rejection reason instead of asserting unstated conceptual constraints.
+
+2026-06-26 11:54:40 +07 — Reviewed logical schema against conceptual design for entity/table coverage, exact attribute propagation, relationship FK mapping, M:N junction resolution, surrogate `INT` primary-key standardization, and role-playing FK naming.
+2026-06-26 11:54:40 +07 — Reviewed guardrails: no `FACILITY.facility_description`, no booking-level `rejection_reason`, no FK to demoted natural keys, no unsupported uniqueness on facility/space names, and no UNIQUE on `APPROVAL_DECISION.booking_id` pending stakeholder confirmation.
+2026-06-26 11:54:40 +07 — Reviewed business-rule classification for approved-booking overlap, unavailable-space booking prevention, role restrictions, rejected-reason CHECK, maintenance/status ambiguity, participant-capacity comparison, cancellation/no-show lifecycle, and staff-view authorization scope.
+
+2026-06-26 12:04:54 +07 — Reviewed requirement analysis, conceptual ERD, and logical schema against the original Facility Manager requirements; found complete core coverage and strong traceability across stages.
+2026-06-26 12:04:54 +07 — Verified logical FK/PK data-type matching, surrogate `INT` PK standardization, email/user_id/unique_space_code uniqueness, absence of unsupported facility description/booking-level rejection reason, in-row start/end CHECK constraints, nullable note fields, explicit FK actions, and complete constraint naming.
+2026-06-26 12:04:54 +07 — Identified conditions before implementation: resolve conceptual approval-decision cardinality versus logical audit-history preservation, implement overlap/unavailable-space/role restrictions, and clarify maintenance/status/capacity/staff-view open questions.
+2026-06-26 12:04:54 +07 — Assigned final validation decision `ACCEPTED WITH CONDITIONS`.
+
+2026-06-26 12:12:42 +07 — Reviewed DDL against logical design for exact table/column coverage, surrogate `INT IDENTITY` PKs, demoted natural-key UNIQUE constraints, FK target/action correctness, allowed-value CHECK constraints, and in-row CHECK constraints.
+2026-06-26 12:12:42 +07 — Reviewed implementation conditions from validation report: overlap prevention, unavailable-space prevention, approval-maker role restriction, and check-in/completion role restrictions are implemented with triggers.
+2026-06-26 12:12:42 +07 — Reviewed unresolved items and intentionally left maintenance status values, account status values, cancellation/no-show triggers, approval-required criteria, capacity comparison, maintenance/status synchronization, staff-view authorization, and facility-name value enforcement unresolved because they remain open in the validated design.
+
+2026-06-26 12:19:57 +07 — Reviewed sample data against DDL constraints and triggers, especially allowed values, unavailable-space booking prevention, approved-overlap prevention, role restrictions, and rejected-booking rejection reason.
+2026-06-26 12:19:57 +07 — Confirmed sample data covers normal operations plus required exceptional scenarios without adding unsupported tables or columns; department data is represented through `USER_ACCOUNT.department` because no department table exists.
+
+2026-06-26 12:24:30 +07 — Reviewed SQL query design against actual DDL and sample data to ensure table/column names are valid and queries answer realistic business questions for students, lecturers, teaching assistants, facility staff, department administrators, and facility managers.
+2026-06-26 12:24:30 +07 — Confirmed output contains twelve meaningful read-only SELECT queries with joins, filters, grouping, aggregation, ordering, and required explanatory comments.

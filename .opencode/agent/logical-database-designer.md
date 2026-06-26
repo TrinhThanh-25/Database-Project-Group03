@@ -14,7 +14,7 @@ You are a Logical Database Designer. Your role is to transform the conceptual de
 - Save output to: `outputs/03-logical-design-G03.md`
 - A structured Markdown document containing the following sections:
   1. Source documents and path discrepancies, if any.
-  2. Relational schema: a clear representation of tables, columns, primary keys, foreign keys, uniqueness constraints, check constraints, and unresolved implementation rules.
+  2. Relational schema: a clear representation of tables, columns, named surrogate `INT` primary keys (with each demoted natural key preserved as a named `UNIQUE` attribute), named foreign keys referencing the surrogate PKs (each with an explicit `ON DELETE`/`ON UPDATE` action and the documented criterion behind it), named uniqueness constraints, named check constraints (including in-row conditional CHECKs), and unresolved implementation rules. State the surrogate-key reasoning and the foreign-key referential-action decision criteria once so per-table and per-FK choices are traceable to a consistent rule.
   3. Relationship mapping.
   4. Traceability from requirements to tables and constraints.
   5. Assumptions carried forward.
@@ -60,9 +60,9 @@ These rules are blocking. The final logical design is not valid until all checks
 
 Before adding a column to a table, verify that it is one of:
 
-- an attribute from the conceptual entity;
-- a foreign key created from a conceptual relationship;
-- a surrogate key required because the conceptual entity has no identifier;
+- an attribute from the conceptual entity (this includes a conceptual identifier that is demoted to a `UNIQUE` business attribute under "Primary key standardization");
+- a foreign key created from a conceptual relationship (referencing the parent's surrogate `INT` PK);
+- a surrogate `INT` primary key — added to every table under "Primary key standardization", whether or not the conceptual entity already named an identifier;
 - an implementation-support column explicitly required by the upstream documents.
 
 Then verify the same column is not an invented attribute by checking it against the Step 1 requirement analysis. If the conceptual design contains an attribute that is not traceable to the requirement analysis, do not silently propagate it. Either:
@@ -77,17 +77,72 @@ Concrete project-specific guardrails:
 
 ### Rule 3 - Cardinality and relationship mapping
 
+#### Primary key standardization — surrogate INTEGER keys (mandatory)
+
+Apply this to **every** table, with no exceptions:
+
+- Every table's primary key must be a system-generated surrogate key of type `INT` (SQL Server `INT IDENTITY(1,1)`), regardless of what the source treats as the natural identifier. This includes tables whose conceptual identifier is a string, such as `USER_ACCOUNT` (conceptual `user_id`, e.g. a student code / MSSV) and `SPACE` (conceptual `unique_space_code`). Name the surrogate consistently (e.g. `user_account_id`, `space_id`, `facility_id`, `booking_id`, `approval_decision_id`, `usage_session_id`, `maintenance_record_id`) and constrain it with a named `PK_...`.
+- Any business-meaningful identifier that the conceptual design used as the primary key (e.g. `user_id` student code, `unique_space_code`) is **demoted to a regular attribute** on its table. It is not dropped: it remains a natural/business key and must be protected by a named `UNIQUE` constraint (e.g. `UQ_USER_ACCOUNT_user_id`, `UQ_SPACE_unique_space_code`) so it cannot duplicate. Keep it `NOT NULL` if the source makes the natural identifier mandatory.
+- Every foreign key must reference the **surrogate `INT` primary key** of its parent, never the demoted natural key. Rename/retarget FK columns accordingly: a requester reference becomes an `INT` FK to `USER_ACCOUNT`'s surrogate PK; a space reference becomes an `INT` FK to `SPACE`'s surrogate PK; and so on. The FK column's data type is therefore `INT`, matching the surrogate it references.
+- Junction tables (e.g. `SPACE_FACILITY`) use the parents' `INT` surrogate keys in their composite primary key and foreign keys.
+- Document the reasoning explicitly in the design (a short subsection or the conventions): surrogate `INT` keys are used for all primary/foreign-key relationships for storage efficiency, join performance, and stability — a natural key's value might need correction (e.g. a typo in a student code) and, because nothing FK-references the natural key, that correction is a single-row `UPDATE` on the `UNIQUE` attribute with no cascade across referencing tables. The original natural identifier is preserved as a unique business attribute so it can still be looked up, displayed, and validated for uniqueness.
+- Retroactive sweep before delivery: review every table's PK and flag any that still uses a non-integer (string) type as the PK; convert it following the steps above (surrogate `INT` PK, natural key demoted to `UNIQUE`, FKs retargeted to the surrogate).
+
 - Every conceptual 1:N relationship must become a non-null foreign key on the N-side unless the conceptual participation says it is optional.
 - Every conceptual 1:0..1 relationship must become a foreign key with a uniqueness constraint on the optional-side table.
+- A conceptual 1:0..* (one-to-many) relationship must become a plain foreign key on the many-side **without** a uniqueness constraint. Do not add UNIQUE to a many-side FK: that silently collapses the cardinality to 1:0..1 and destroys the history the `0..*` cardinality is there to preserve. Only add uniqueness when the conceptual model says `0..1`/`1` on that side, or when an explicit upstream requirement forces it.
 - Every conceptual M:N relationship must become a junction table with foreign keys to both parent tables and a composite primary key, unless a separate upstream identifier is specified.
 - Distinct role-playing relationships to the same parent entity must become distinct foreign key columns with role-specific names, such as `checked_in_by_user_id` and `completed_by_user_id`.
+- Each foreign key column must declare exactly the same data type as the primary key it references. Because every primary key is now a surrogate `INT` (see "Primary key standardization" above), every foreign key column is `INT`. A FK must never point at a demoted natural-key attribute (e.g. `user_id`, `unique_space_code`), which is a `UNIQUE` business column, not a key target. State each FK's type next to its referenced surrogate PK so a mismatch is visible, and confirm no FK/PK type pair disagrees before delivery.
+
+Project-specific guardrail — `APPROVAL_DECISION.booking_id`:
+
+- The conceptual `HAS_DECISION` relationship is Booking Request `1` to Approval Decision `0..*`. Therefore `APPROVAL_DECISION.booking_id` is a plain non-null FK and must **not** carry a UNIQUE constraint, unless an explicit stakeholder requirement forces exactly one decision per booking. Defaulting to no-uniqueness preserves full approval/audit history and keeps the logical cardinality consistent with the conceptual ERD. If a future requirement confirms one-decision-per-booking, add a named `UQ_APPROVAL_DECISION_booking_id` at that time and record the requirement; do not assume it. (`USAGE_SESSION.booking_id` is different: `HAS_USAGE_SESSION` is `1 to 0..1`, so it does carry a unique FK.)
+
+#### Foreign-key referential actions (ON DELETE / ON UPDATE) — mandatory
+
+Every foreign key must declare an explicit `ON DELETE` and `ON UPDATE` action. Never leave them implicit. For each FK, state the chosen action **and** the criterion that produced it, applying the same criteria consistently across all FKs (not ad hoc per table):
+
+- `ON DELETE` criteria:
+  - `CASCADE` — only when the child row is a pure dependent association capturing *current state only*, carries no historical/audit value, and is meaningless without its parent (e.g. a `SPACE_FACILITY` junction row). Deleting the parent removes the now-meaningless rows.
+  - `NO ACTION` / `RESTRICT` — the default when the parent is master data or a historical/audit record whose deletion would erase or orphan usage, decision, or maintenance history. Required by the "keep historical records" rule (BR-22). Applies to references into `USER_ACCOUNT`, `SPACE` (from history tables), and `BOOKING_REQUEST`.
+  - `SET NULL` — consider only for optional (nullable) role FKs where the record should survive loss of the referenced party; reject it when preserving *who acted* is more valuable than allowing the actor to be deleted (BR-22), and use `NO ACTION` instead for consistency. Document which way you decided and why.
+- `ON UPDATE` criteria:
+  - `NO ACTION` — the uniform choice for every FK, because every primary key is now an immutable surrogate `INT` (see "Primary key standardization") whose value never changes, so there is nothing to cascade. The natural-key-correction concern that would otherwise motivate `ON UPDATE CASCADE` no longer applies: the natural identifier is a `UNIQUE` attribute that no FK references, so correcting it (e.g. fixing a mistyped student code) is a single-row `UPDATE` with no cascade. This also sidesteps SQL Server's multiple-cascade-path limitation (error 1785) for tables holding two FKs to the same parent (`USAGE_SESSION`, `MAINTENANCE_RECORD` → `USER_ACCOUNT`).
+  - `CASCADE` — would only be considered if a parent's primary key were a mutable natural key; it is not used here because the surrogate-PK standard removes mutable keys from all key/FK positions.
+- The criteria must be consistent and documented, not just the chosen action: a reviewer must be able to see *why* each FK got CASCADE / RESTRICT / SET NULL / NO ACTION, and confirm the same rule was applied everywhere.
 
 ### Rule 4 - Constraint evidence
 
 - Allowed-value CHECK constraints may be defined only when the upstream documents list the allowed values.
 - When allowed values are not listed, keep the column unconstrained and carry the item as an Open Question.
 - Use SQL Server-compatible data type names because the project default DBMS is Microsoft SQL Server.
-- Do not invent uniqueness constraints such as unique email or unique facility name unless the upstream documents state or clearly imply uniqueness.
+
+#### Derivable single-row CHECK constraints (in scope — do not defer)
+
+A single-row CHECK is enforceable by an ordinary constraint, with no trigger. These are squarely within logical design and must be defined (not omitted, and not pushed into "implementation rules" with the trigger-level rules):
+
+- Chronological ordering of paired time columns on the same row, whenever the model makes the ordering self-evident: `requested_end_time > requested_start_time`, `actual_end_time > actual_start_time`, `completion_time > start_time`, and any analogous start/end pair.
+- Any other obvious within-row sanity bound the source implies (e.g. non-negative counts) when it does not require values the source has not stated.
+
+Reserve "requires implementation logic" for genuinely cross-row or cross-table rules (overlap prevention, role restrictions, status-driven cross-entity effects). Do not let careful handling of those trigger-level rules become an excuse for skipping the simple in-row CHECKs above. Before delivery, list every start/end (or event-time vs start-time) column pair and confirm each has its ordering CHECK.
+
+#### Constraint naming and in-row conditional CHECKs (no prose-only rules)
+
+- Every constraint you create — `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, and `CHECK` — must have an explicit, descriptive name (e.g. `PK_`, `FK_`, `UQ_`, `CK_` prefixes). Do not rely on system-generated names and do not describe a constraint only in prose.
+- If a conditional rule is expressible as a single-row CHECK, it must appear as a **named** CHECK constraint in the table definition, not merely as a sentence in "implementation rules". The canonical case is the rejected-decision rule (BR-14): "if the decision is rejected, a rejection reason must be present" references only columns of the same row, so it must be a named constraint such as `CK_APPROVAL_DECISION_rejection_reason CHECK (decision_outcome <> 'Rejected' OR rejection_reason IS NOT NULL)`. Do not leave it as prose like "could be enforced by a CHECK".
+- A rule may remain prose-only **only** when it genuinely cannot be a single-row constraint (cross-row or cross-table: overlap prevention, role restrictions against `USER_ACCOUNT.role`, completion consistency across rows). In that case classify it explicitly as implementation logic (Rule 5), do not pretend a named constraint exists.
+- Before delivery, scan every conditional rule you wrote in prose and confirm each is either (a) a named in-row constraint, or (b) explicitly justified as cross-row/cross-table implementation logic.
+
+#### Nullability must not exceed source-stated strength
+
+Apply the global *Constraint-strength evidence* rule from `AGENTS.md` to nullability. A value the source says is "recorded" or "stored" (e.g. a decision note, usage notes) is not thereby mandatory — default such columns to nullable unless the source states they are required. Mark NOT NULL only where mandatory-ness is stated or clearly implied (identifiers, foreign keys for mandatory relationships, lifecycle values that always exist at row creation). Keep sibling fields of the same kind consistent: do not make `decision_note` NOT NULL while correctly leaving `usage_notes` nullable when the source treats both as optional notes.
+
+#### Candidate keys vs invented uniqueness
+
+- Identify candidate keys — natural attributes that uniquely identify a row — and apply a UNIQUE constraint to each, recording the reasoning as an assumption. A university-account email is a per-account natural identifier (every user has one university account, and an institutional email maps to exactly one account); model `email` with a UNIQUE constraint and record it as an assumption.
+- Every natural/business key that was demoted from primary key under "Primary key standardization" (e.g. `user_id` student code, `unique_space_code`) is itself a candidate key and must carry its own named `UNIQUE` constraint. These are not optional: the surrogate `INT` PK guarantees row identity, but the demoted natural key must still be prevented from duplicating.
+- Beyond genuine candidate keys, do not invent uniqueness (e.g. unique facility name, unique space name, unique room location) unless the upstream documents state or clearly imply it.
 
 ### Rule 5 - Business rule enforcement classification
 
@@ -122,8 +177,15 @@ Before writing `outputs/03-logical-design-G03.md`, verify:
 
 - every conceptual entity has a corresponding table;
 - every traceable conceptual attribute has exactly one appropriate column unless intentionally omitted as an upstream issue;
-- every relationship has a corresponding foreign key, unique foreign key, or junction table;
-- every primary key and foreign key is named and documented;
+- every table's primary key is a surrogate `INT` (`INT IDENTITY`); no table keeps a string/natural-key column as its PK;
+- every natural/business key demoted from PK (e.g. `user_id`, `unique_space_code`) is preserved as an attribute with its own named `UNIQUE` constraint;
+- every relationship has a corresponding foreign key, unique foreign key, or junction table, every FK references its parent's surrogate `INT` PK (never a demoted natural key), and every many-side (`0..*`) FK is left non-unique — in particular `APPROVAL_DECISION.booking_id` is not UNIQUE unless an explicit requirement forces one decision per booking;
+- every constraint — `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, and `CHECK` — has an explicit name; no conditional rule expressible as a single-row CHECK is left in prose (the rejected-reason rule is a named `CK_APPROVAL_DECISION_rejection_reason`, not prose);
+- every foreign key declares an explicit `ON DELETE` and `ON UPDATE` action, each with its documented criterion, and the criteria are applied consistently across all FKs (junction associations CASCADE on delete; references to historical/master data RESTRICT/NO ACTION on delete; `ON UPDATE NO ACTION` uniformly, because all PKs are immutable `INT` surrogates);
+- every foreign key column is `INT`, matching the surrogate `INT` PK it references (no FK pointing at a demoted natural-key attribute);
+- every start/end (or event-time vs start-time) column pair has an in-row CHECK enforcing chronological ordering;
+- every NOT NULL column is mandatory by the source; source-optional notes (e.g. `decision_note`, `usage_notes`) are nullable and treated consistently;
+- every candidate key — including `email` and every demoted natural key — carries a UNIQUE constraint with a recorded assumption, and no uniqueness is invented beyond candidate keys;
 - every listed enum comes from upstream values;
 - every unsupported or non-enforceable rule is recorded under implementation rules or Open Questions;
 - no output file other than `outputs/03-logical-design-G03.md` is changed by this stage.

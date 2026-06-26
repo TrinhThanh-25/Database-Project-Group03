@@ -39,6 +39,8 @@ Attributes:
 
 This table is the authoritative relationship model. The Mermaid diagram in §2 is a visual aid only.
 
+> Write the `Cardinality` value in the same order as the columns: Entity-A side first, then Entity-B side (e.g. `1 to 0..*` means A=1, B=0..*). Keep this orientation uniform on every row — do not flip it for individual rows.
+
 | Relationship Name | Entity A | Entity B | Cardinality | Participation | Explanation |
 |---|---|---|---|---|---|
 | [RELATIONSHIP_NAME] | [Entity A] | [Entity B] | [e.g. 1 to 0..*] | A→B: Each [A] … [zero/one/many] [B]. B→A: Each [B] must … [exactly one / zero or one] [A]. | [Source: upstream analysis "Relationships" row / business rule ref] |

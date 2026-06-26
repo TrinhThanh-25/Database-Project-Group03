@@ -47,6 +47,8 @@ Possible [enum field name]s (if applicable):
 
 ## 7. State Transitions
 
+> List only transitions clearly implied by Layer B. Status values whose transition trigger/role the source does not state — e.g. `Cancelled` and `No-show` — stay in the allowed-values list but are NOT asserted as transitions here; carry their missing trigger/role as scoped Open Questions (application/backend-layer), and note that this is intentional, not a data-modeling gap.
+
 ### 7.1 [Entity] Status Transitions
 
 | From Status | To Status | Trigger / Condition (grounded in Layer B) |
@@ -94,4 +96,4 @@ Add additional rows as required.
 
 ## 13. Open Questions
 
-- [Every "reasonable but unstated" rule, every Layer-A-only detail that didn't qualify for Section 6, ambiguous transition, or ambiguous cross-entity dependency that was deliberately NOT asserted as fact above]
+- Question: [Every "reasonable but unstated" rule, every Layer-A-only detail that didn't qualify for Section 6, ambiguous transition, or ambiguous cross-entity dependency that was deliberately NOT asserted as fact above] — Scope: [Database | Backend | Frontend | Authorization | Business Workflow | Mixed | Other]
