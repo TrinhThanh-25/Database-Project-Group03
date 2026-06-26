@@ -36,6 +36,7 @@ The SQL file must include realistic records for the implemented schema. Required
 - Approval or rejection details where applicable.
 - Check-in and completion details where applicable.
 - Maintenance records with different statuses when the DDL supports those statuses.
+- When the DDL defines enumerated status values with `CHECK` constraints, cover every allowed value at least once where it can be done without violating triggers or creating misleading business scenarios. For `SPACE.current_status`, prefer adding a separate unbooked sample space for values such as `In use` if changing an already booked space would conflict with booking triggers.
 
 The sample data must also include exceptional cases for testing:
 - A rejected booking with a rejection reason.
@@ -53,6 +54,7 @@ The SQL file must also include:
 - Comments separating SQL sections clearly.
 - Explicit column lists in every `INSERT`.
 - `GO` batch separators where useful for SQL Server readability.
+- Clear human-readable notes that do not contradict current status values. When a row represents a historical approval for a booking whose current status later changed to `Cancelled`, `Checked in`, `Completed`, or `No-show`, phrase notes as historical approval notes rather than as the current state.
 
 ## Skills Used
 
@@ -73,8 +75,9 @@ The SQL file must also include:
 7. Add booking records with valid statuses and realistic dates.
 8. Add approval, rejection, check-in, completion, cancellation, no-show, and maintenance details where required.
 9. Verify that all inserted data satisfies foreign key, `CHECK`, `UNIQUE`, `NOT NULL`, and trigger constraints.
-10. Build a coverage checklist that maps required normal and exceptional cases to specific inserted IDs.
-11. Save the final SQL script as `outputs/06-sample-data-G03.sql`.
+10. Align usage-session `actual_start_time` and `actual_end_time` with the related booking request window unless the DDL or prior-stage assumptions explicitly allow and document early check-in or late checkout.
+11. Build a coverage checklist that maps required normal and exceptional cases to specific inserted IDs.
+12. Save the final SQL script as `outputs/06-sample-data-G03.sql`.
 
 ## Rules and Constraints
 
@@ -88,6 +91,10 @@ The SQL file must also include:
 - Ensure booking status values exactly match the allowed values in the database schema.
 - Ensure exceptional cases are represented without breaking database constraints.
 - If the sample script assumes a clean database after `outputs/05-db-definition-G03.sql`, state that clearly in the header. If idempotency is required by the user, implement it explicitly with a dependency-safe approach.
+- If producing an idempotent script, use one consistent dependency-safe strategy: either guarded `IF NOT EXISTS` inserts for every fixed key/unique value, or child-to-parent cleanup scoped only to the sample IDs/codes used by the script before inserting. Do not mix partial idempotency with unguarded fixed identity values.
+- If using fixed identity values with `SET IDENTITY_INSERT`, ensure reruns are handled by the selected idempotency strategy or explicitly document that the script is clean-database-only.
+- Do not let descriptive notes create ambiguity for query tests. For historical approval rows, explicitly distinguish prior approval from the booking's current lifecycle status.
+- Prefer usage-session actual times inside the requested booking window. If an exceptional row intentionally starts before the requested start or ends after the requested end, tag and document that as an assumption in the header.
 - Keep internal self-check notes in `.opencode/logging/self-check-log.md`, command/reasoning logs in `.opencode/logging/run-command-log.md`, and review notes in `.opencode/logging/review-log.md`; do not place internal agent self-check content in the user-facing SQL output.
 
 ## Required Pre-Write Checklist
@@ -103,4 +110,8 @@ Before writing the final SQL, confirm:
 - Approval decision makers satisfy trigger role requirements.
 - Rejected bookings that have approval decisions include a non-empty rejection reason.
 - Usage sessions satisfy check-in/completion trigger requirements.
+- Usage session actual times are within the requested booking window, unless explicitly documented as an assumption.
+- Approval/rejection notes are consistent with the current booking status and cannot be confused with a separate decision outcome column unless the DDL implements one.
+- Allowed status values implemented by `CHECK` constraints are covered where practical, including `SPACE.current_status = 'In use'` via a safe unbooked space when needed.
+- The script is either fully idempotent or clearly documented as clean-database-only; no partial idempotency is left behind.
 - The output includes assumptions, open questions, trigger compliance, and sample coverage traceability.

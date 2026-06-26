@@ -329,3 +329,10 @@ Unsupported additions check: PASS — No unsupported allowed-value CHECKs, `UQ_A
 
 Blocking failures remaining: none
 Delivery status: READY
+
+Scope discipline: PASS - Limited changes to `.opencode/agent/sample-data-preparer.md`, `.opencode/templates/sample-data-template.md`, and `.opencode/evaluation/sample-data-rubric.md`.
+Report coverage: PASS - Added future-generation rules for R6-01 idempotency clarity/strategy, R6-02 historical approval note wording, R6-03 usage-session timing assumptions, and R6-04 allowed status coverage.
+Output protection: PASS - Verified no diff exists for `outputs/06-sample-data-G03.sql`.
+
+Blocking failures remaining: none
+Delivery status: READY

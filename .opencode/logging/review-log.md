@@ -96,3 +96,5 @@
 2026-06-26 13:23:00 +07 — Reviewed SQL query design against the current DDL and sample data, including the absence of implemented views and the absence of an approval-decision outcome column.
 2026-06-26 13:23:00 +07 — Confirmed the query set covers all major staff-view topics from BR-25 plus requester-facing availability and management-facing utilization/workload summaries.
 2026-06-26 13:23:00 +07 — Confirmed each query is read-only, uses clear aliases, combines related tables with joins where appropriate, and includes required business-question comments.
+
+2026-06-27 00:35:00 +07 - Confirmed the updated agent/template/rubric now require clear idempotency behavior, unambiguous historical approval notes, usage-session timing checks, and practical coverage of allowed status values such as `SPACE.current_status = 'In use'`.

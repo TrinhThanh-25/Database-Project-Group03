@@ -45,3 +45,16 @@ The sample data appears to satisfy the implemented DDL constraints:
 ## Final assessment
 
 `outputs/06-sample-data-G03.sql` is acceptable under the current DDL and clean-database execution assumption. The main improvement is not a constraint fix but a robustness/clarity improvement: make the sample script idempotent if standalone reruns are expected, and clarify approval notes or early check-in timing if demo queries depend on those semantics.
+
+## Follow-up changes applied to agent documentation
+
+Per the request to avoid editing output files directly, the following changes were applied to stage-6 agent documentation so future runs generate improved sample data:
+
+- Updated `.opencode/agent/sample-data-preparer.md` to require clear idempotency behavior, either clean-database-only documentation or one consistent dependency-safe idempotent strategy.
+- Updated `.opencode/agent/sample-data-preparer.md` to require approval notes to be semantically clear when approval rows are historical and the current booking status is later `Cancelled`, `Checked in`, `Completed`, or `No-show`.
+- Updated `.opencode/agent/sample-data-preparer.md` to prefer usage-session actual times inside the requested booking window unless early check-in or late checkout is explicitly documented as an assumption.
+- Updated `.opencode/agent/sample-data-preparer.md` to encourage practical coverage of all allowed `CHECK` status values, including adding a safe unbooked `SPACE.current_status = 'In use'` row when that value is allowed and otherwise uncovered.
+- Updated `.opencode/templates/sample-data-template.md` to include an explicit idempotency line in the header template and an enumerated-value coverage line in the traceability section.
+- Updated `.opencode/templates/sample-data-template.md` to remind future generation to keep approval notes consistent with booking lifecycle status and keep usage-session times inside the requested booking window unless documented otherwise.
+- Updated `.opencode/evaluation/sample-data-rubric.md` to evaluate idempotency completeness, fixed identity insert rerun behavior, usage-session timing, historical approval-note clarity, and practical status-value coverage.
+- No changes were made to `outputs/06-sample-data-G03.sql`.
