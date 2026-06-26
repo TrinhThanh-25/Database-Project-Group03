@@ -2,25 +2,70 @@
     Database Definition Implementation - Group 03
     Target DBMS: Microsoft SQL Server
 
-    Authoritative inputs:
+    Authoritative implementation inputs:
     - outputs/03-logical-design-G03.md
     - outputs/04-design-validation-G03.md
 
-    Source discipline notes:
-    - Implements only tables, columns, constraints, allowed values, implementation logic, indexes,
-      and views documented in the logical design and validation report.
-    - Does not add CHECK constraints for unresolved values such as USER_ACCOUNT.account_status
-      or MAINTENANCE_RECORD.status.
-    - Keeps APPROVAL_DECISION.booking_id non-unique to preserve decision/audit history as required
-      by the logical design and validation report.
+    [upstream] Assumptions carried forward from logical design:
+    - Facility ID, Booking ID, Approval Decision ID, Usage Session ID, and Maintenance Record ID were proposed identifiers.
+    - Decision note and rejection reason are distinct APPROVAL_DECISION facts.
+    - Facility is treated as a reusable facility type/name across spaces.
+    - Generic “staff” was not added as a separate actor; staff-view scope remains unresolved.
+    - USER is implemented as USER_ACCOUNT.
+    - Every table uses a surrogate INT IDENTITY primary key; user_id and unique_space_code are demoted unique business attributes.
+    - USER_ACCOUNT.email is treated as a candidate key.
+    - Source-optional note/descriptive fields remain nullable.
+    - APPROVAL_DECISION.booking_id remains non-unique to preserve decision/audit history.
+
+    [ddl-stage] Assumptions:
+    - Surrogate primary key columns are implemented with SQL Server IDENTITY(1,1), as allowed by the implementation agent.
+    - Nonclustered indexes are added only for foreign-key columns not already covered by a PK/UQ leading key, as recommended for FK join performance.
+    - Trigger names are DDL-stage names because logical design requires implementation logic but does not prescribe trigger names.
+    - The script uses a documented drop/recreate sequence for repeatable demo execution.
+    - DDL-stage instruction Rule 7 supersedes the logical-design derived decision_outcome column: APPROVAL_DECISION.decision_outcome and its CHECK are not implemented; rejected-booking rejection_reason enforcement is stubbed with cross-table BOOKING_REQUEST.status logic instead.
+
+    OPEN QUESTIONS CARRIED FORWARD:
+    - What values are allowed for USER_ACCOUNT.account_status?
+    - How is SPACE.usage_policy enforced, if at all?
+    - Does creating/starting/completing/changing a MAINTENANCE_RECORD automatically change SPACE.current_status?
+    - Which prior status, trigger, and actor cause BOOKING_REQUEST.booking_status to become Cancelled?
+    - Which prior status, trigger, and actor cause BOOKING_REQUEST.booking_status to become No-show?
+    - Which booking requests require approval, and can any booking bypass approval?
+    - Should a booking have at most one APPROVAL_DECISION or preserve multiple approval/audit decisions?
+    - What values and transitions are allowed for MAINTENANCE_RECORD.status?
+    - Which user roles are allowed to report maintenance issues?
+    - Which user roles are allowed to assign maintenance staff?
+    - Does staff view access mean Facility Staff only or other staff roles too?
+    - Should BOOKING_REQUEST.expected_number_of_participants be compared with SPACE.capacity?
+    - What exact mechanism should enforce approved-booking overlap prevention?
+    - What exact mechanism should enforce unavailable-space booking prevention?
 */
 
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
+/* Documented drop/recreate sequence for demo repeatability. */
+DROP TRIGGER IF EXISTS dbo.TR_USAGE_SESSION_completion_consistency;
+DROP TRIGGER IF EXISTS dbo.TR_USAGE_SESSION_validate_facility_staff_roles;
+DROP TRIGGER IF EXISTS dbo.TR_APPROVAL_DECISION_require_rejection_reason;
+DROP TRIGGER IF EXISTS dbo.TR_APPROVAL_DECISION_validate_decision_maker_role;
+DROP TRIGGER IF EXISTS dbo.TR_BOOKING_REQUEST_prevent_approved_overlap;
+DROP TRIGGER IF EXISTS dbo.TR_BOOKING_REQUEST_prevent_unavailable_space_booking;
+GO
+
+DROP TABLE IF EXISTS dbo.MAINTENANCE_RECORD;
+DROP TABLE IF EXISTS dbo.USAGE_SESSION;
+DROP TABLE IF EXISTS dbo.APPROVAL_DECISION;
+DROP TABLE IF EXISTS dbo.BOOKING_REQUEST;
+DROP TABLE IF EXISTS dbo.SPACE_FACILITY;
+DROP TABLE IF EXISTS dbo.FACILITY;
+DROP TABLE IF EXISTS dbo.SPACE;
+DROP TABLE IF EXISTS dbo.USER_ACCOUNT;
+GO
+
 /* ============================================================
-   1. Core master tables
+   1. USER_ACCOUNT
    ============================================================ */
 
 CREATE TABLE dbo.USER_ACCOUNT
@@ -52,6 +97,16 @@ CREATE TABLE dbo.USER_ACCOUNT
 );
 GO
 
+-- OPEN QUESTION: What values are allowed for USER_ACCOUNT.account_status?
+-- No CHECK constraint is added because logical design §2.1 and §6 leave account_status values unresolved.
+-- OPEN QUESTION: Does staff view access mean Facility Staff only, or does it include other staff roles?
+-- No authorization table, view permission constraint, or role expansion is added in DDL.
+GO
+
+/* ============================================================
+   2. SPACE
+   ============================================================ */
+
 CREATE TABLE dbo.SPACE
 (
     space_id INT IDENTITY(1,1) NOT NULL,
@@ -82,6 +137,16 @@ CREATE TABLE dbo.SPACE
 );
 GO
 
+-- OPEN QUESTION: How is SPACE.usage_policy enforced, if at all, during booking submission or approval?
+-- No constraint is added because usage-policy enforcement remains unresolved in logical design §6.
+-- OPEN QUESTION: Does creating/starting/completing/changing MAINTENANCE_RECORD automatically update SPACE.current_status?
+-- No synchronization trigger is added because logical design §6 leaves this unresolved.
+GO
+
+/* ============================================================
+   3. FACILITY
+   ============================================================ */
+
 CREATE TABLE dbo.FACILITY
 (
     facility_id INT IDENTITY(1,1) NOT NULL,
@@ -92,7 +157,7 @@ CREATE TABLE dbo.FACILITY
 GO
 
 /* ============================================================
-   2. Association table
+   4. SPACE_FACILITY
    ============================================================ */
 
 CREATE TABLE dbo.SPACE_FACILITY
@@ -114,8 +179,12 @@ CREATE TABLE dbo.SPACE_FACILITY
 );
 GO
 
+CREATE INDEX IX_SPACE_FACILITY_facility_id
+    ON dbo.SPACE_FACILITY (facility_id);
+GO
+
 /* ============================================================
-   3. Booking, approval, usage, and maintenance history tables
+   5. BOOKING_REQUEST
    ============================================================ */
 
 CREATE TABLE dbo.BOOKING_REQUEST
@@ -169,160 +238,13 @@ CREATE TABLE dbo.BOOKING_REQUEST
 );
 GO
 
-CREATE TABLE dbo.APPROVAL_DECISION
-(
-    approval_decision_id INT IDENTITY(1,1) NOT NULL,
-    booking_id INT NOT NULL,
-    decision_maker_user_account_id INT NOT NULL,
-    decision_outcome NVARCHAR(20) NOT NULL,
-    decision_time DATETIME2(0) NOT NULL,
-    decision_note NVARCHAR(1000) NULL,
-    rejection_reason NVARCHAR(1000) NULL,
-
-    CONSTRAINT PK_APPROVAL_DECISION PRIMARY KEY (approval_decision_id),
-    CONSTRAINT FK_APPROVAL_DECISION_booking_id FOREIGN KEY (booking_id)
-        REFERENCES dbo.BOOKING_REQUEST (booking_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT FK_APPROVAL_DECISION_decision_maker_user_account_id FOREIGN KEY (decision_maker_user_account_id)
-        REFERENCES dbo.USER_ACCOUNT (user_account_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT CK_APPROVAL_DECISION_decision_outcome CHECK (decision_outcome IN ('Approved', 'Rejected')),
-    CONSTRAINT CK_APPROVAL_DECISION_rejection_reason CHECK
-    (
-        decision_outcome <> 'Rejected'
-        OR rejection_reason IS NOT NULL
-    )
-);
-GO
-
-CREATE TABLE dbo.USAGE_SESSION
-(
-    usage_session_id INT IDENTITY(1,1) NOT NULL,
-    booking_id INT NOT NULL,
-    checked_in_by_user_account_id INT NOT NULL,
-    completed_by_user_account_id INT NULL,
-    actual_start_time DATETIME2(0) NOT NULL,
-    initial_condition_of_space NVARCHAR(1000) NULL,
-    actual_end_time DATETIME2(0) NULL,
-    final_condition_of_space NVARCHAR(1000) NULL,
-    usage_notes NVARCHAR(1000) NULL,
-
-    CONSTRAINT PK_USAGE_SESSION PRIMARY KEY (usage_session_id),
-    CONSTRAINT UQ_USAGE_SESSION_booking_id UNIQUE (booking_id),
-    CONSTRAINT FK_USAGE_SESSION_booking_id FOREIGN KEY (booking_id)
-        REFERENCES dbo.BOOKING_REQUEST (booking_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT FK_USAGE_SESSION_checked_in_by_user_account_id FOREIGN KEY (checked_in_by_user_account_id)
-        REFERENCES dbo.USER_ACCOUNT (user_account_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT FK_USAGE_SESSION_completed_by_user_account_id FOREIGN KEY (completed_by_user_account_id)
-        REFERENCES dbo.USER_ACCOUNT (user_account_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT CK_USAGE_SESSION_actual_time_order CHECK
-    (
-        actual_end_time IS NULL
-        OR actual_end_time > actual_start_time
-    )
-);
-GO
-
-CREATE TABLE dbo.MAINTENANCE_RECORD
-(
-    maintenance_record_id INT IDENTITY(1,1) NOT NULL,
-    space_id INT NOT NULL,
-    reporter_user_account_id INT NOT NULL,
-    assigned_staff_user_account_id INT NOT NULL,
-    problem_description NVARCHAR(1000) NOT NULL,
-    start_time DATETIME2(0) NOT NULL,
-    completion_time DATETIME2(0) NULL,
-    status NVARCHAR(50) NULL,
-    result_note NVARCHAR(1000) NULL,
-
-    CONSTRAINT PK_MAINTENANCE_RECORD PRIMARY KEY (maintenance_record_id),
-    CONSTRAINT FK_MAINTENANCE_RECORD_space_id FOREIGN KEY (space_id)
-        REFERENCES dbo.SPACE (space_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT FK_MAINTENANCE_RECORD_reporter_user_account_id FOREIGN KEY (reporter_user_account_id)
-        REFERENCES dbo.USER_ACCOUNT (user_account_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT FK_MAINTENANCE_RECORD_assigned_staff_user_account_id FOREIGN KEY (assigned_staff_user_account_id)
-        REFERENCES dbo.USER_ACCOUNT (user_account_id)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT CK_MAINTENANCE_RECORD_time_order CHECK
-    (
-        completion_time IS NULL
-        OR completion_time > start_time
-    )
-);
-GO
-
-/* ============================================================
-   4. Indexes for foreign keys, joins, status/time filters, and views
-   ============================================================ */
-
-CREATE INDEX IX_SPACE_current_status
-    ON dbo.SPACE (current_status);
-GO
-
-CREATE INDEX IX_SPACE_FACILITY_facility_id
-    ON dbo.SPACE_FACILITY (facility_id);
-GO
-
 CREATE INDEX IX_BOOKING_REQUEST_requester_user_account_id
     ON dbo.BOOKING_REQUEST (requester_user_account_id);
 GO
 
-CREATE INDEX IX_BOOKING_REQUEST_space_status_time
-    ON dbo.BOOKING_REQUEST (space_id, booking_status, requested_start_time, requested_end_time);
+CREATE INDEX IX_BOOKING_REQUEST_space_id
+    ON dbo.BOOKING_REQUEST (space_id);
 GO
-
-CREATE INDEX IX_BOOKING_REQUEST_status_time
-    ON dbo.BOOKING_REQUEST (booking_status, requested_start_time, requested_end_time);
-GO
-
-CREATE INDEX IX_APPROVAL_DECISION_booking_id
-    ON dbo.APPROVAL_DECISION (booking_id);
-GO
-
-CREATE INDEX IX_APPROVAL_DECISION_decision_maker_user_account_id
-    ON dbo.APPROVAL_DECISION (decision_maker_user_account_id);
-GO
-
-CREATE INDEX IX_USAGE_SESSION_checked_in_by_user_account_id
-    ON dbo.USAGE_SESSION (checked_in_by_user_account_id);
-GO
-
-CREATE INDEX IX_USAGE_SESSION_completed_by_user_account_id
-    ON dbo.USAGE_SESSION (completed_by_user_account_id);
-GO
-
-CREATE INDEX IX_MAINTENANCE_RECORD_space_id
-    ON dbo.MAINTENANCE_RECORD (space_id);
-GO
-
-CREATE INDEX IX_MAINTENANCE_RECORD_reporter_user_account_id
-    ON dbo.MAINTENANCE_RECORD (reporter_user_account_id);
-GO
-
-CREATE INDEX IX_MAINTENANCE_RECORD_assigned_staff_user_account_id
-    ON dbo.MAINTENANCE_RECORD (assigned_staff_user_account_id);
-GO
-
-CREATE INDEX IX_MAINTENANCE_RECORD_status_start_time
-    ON dbo.MAINTENANCE_RECORD (status, start_time);
-GO
-
-/* ============================================================
-   5. Triggers for validated cross-row and cross-table rules
-   ============================================================ */
 
 CREATE TRIGGER dbo.TR_BOOKING_REQUEST_prevent_unavailable_space_booking
 ON dbo.BOOKING_REQUEST
@@ -370,6 +292,48 @@ BEGIN
 END;
 GO
 
+-- OPEN QUESTION: Which prior status, trigger, and actor cause BOOKING_REQUEST.booking_status to become Cancelled?
+-- OPEN QUESTION: Which prior status, trigger, and actor cause BOOKING_REQUEST.booking_status to become No-show?
+-- No lifecycle transition trigger is added because logical design §6 leaves these unresolved.
+-- OPEN QUESTION: Which booking requests require approval, and can any booking bypass approval?
+-- No required-approval trigger is added because logical design §6 leaves this unresolved.
+-- OPEN QUESTION: Should BOOKING_REQUEST.expected_number_of_participants be compared with SPACE.capacity?
+-- No cross-table capacity trigger is added; only CK_BOOKING_REQUEST_expected_participants_nonnegative is implemented.
+GO
+
+/* ============================================================
+   6. APPROVAL_DECISION
+   ============================================================ */
+
+CREATE TABLE dbo.APPROVAL_DECISION
+(
+    approval_decision_id INT IDENTITY(1,1) NOT NULL,
+    booking_id INT NOT NULL,
+    decision_maker_user_account_id INT NOT NULL,
+    decision_time DATETIME2(0) NOT NULL,
+    decision_note NVARCHAR(1000) NULL,
+    rejection_reason NVARCHAR(1000) NULL,
+
+    CONSTRAINT PK_APPROVAL_DECISION PRIMARY KEY (approval_decision_id),
+    CONSTRAINT FK_APPROVAL_DECISION_booking_id FOREIGN KEY (booking_id)
+        REFERENCES dbo.BOOKING_REQUEST (booking_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT FK_APPROVAL_DECISION_decision_maker_user_account_id FOREIGN KEY (decision_maker_user_account_id)
+        REFERENCES dbo.USER_ACCOUNT (user_account_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION
+);
+GO
+
+CREATE INDEX IX_APPROVAL_DECISION_booking_id
+    ON dbo.APPROVAL_DECISION (booking_id);
+GO
+
+CREATE INDEX IX_APPROVAL_DECISION_decision_maker_user_account_id
+    ON dbo.APPROVAL_DECISION (decision_maker_user_account_id);
+GO
+
 CREATE TRIGGER dbo.TR_APPROVAL_DECISION_validate_decision_maker_role
 ON dbo.APPROVAL_DECISION
 AFTER INSERT, UPDATE
@@ -389,6 +353,84 @@ BEGIN
         THROW 51003, 'Approval decisions must be made by a Facility Staff user or Facility Manager user.', 1;
     END;
 END;
+GO
+
+CREATE TRIGGER dbo.TR_APPROVAL_DECISION_require_rejection_reason
+ON dbo.APPROVAL_DECISION
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- IMPLEMENTATION REQUIRED / STUB for BR-13 / BR-16 under DDL-stage Rule 7:
+    -- Check: if related BOOKING_REQUEST.booking_status = 'Rejected',
+    --        then APPROVAL_DECISION.rejection_reason must be NOT NULL.
+    -- This enforces the rule without adding an APPROVAL_DECISION.decision_outcome column.
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted AS i
+        INNER JOIN dbo.BOOKING_REQUEST AS br
+            ON br.booking_id = i.booking_id
+        WHERE br.booking_status = 'Rejected'
+          AND i.rejection_reason IS NULL
+    )
+    BEGIN
+        THROW 51007, 'A rejected booking must have a non-null approval rejection reason.', 1;
+    END;
+END;
+GO
+
+-- OPEN QUESTION: The logical design carried a derived APPROVAL_DECISION.decision_outcome column, but DDL-stage Rule 7 identifies a decision-outcome gap and requires rejection status to be inferred from BOOKING_REQUEST.booking_status.
+-- Therefore no decision_outcome column is added and no CK_APPROVAL_DECISION_decision_outcome / CK_APPROVAL_DECISION_rejection_reason CHECK can be implemented as an in-row CHECK in this script.
+-- OPEN QUESTION: Should a booking have at most one APPROVAL_DECISION or preserve multiple approval/audit decisions?
+-- APPROVAL_DECISION.booking_id is intentionally not UNIQUE, as required by logical design and validation report.
+GO
+
+/* ============================================================
+   7. USAGE_SESSION
+   ============================================================ */
+
+CREATE TABLE dbo.USAGE_SESSION
+(
+    usage_session_id INT IDENTITY(1,1) NOT NULL,
+    booking_id INT NOT NULL,
+    checked_in_by_user_account_id INT NOT NULL,
+    completed_by_user_account_id INT NULL,
+    actual_start_time DATETIME2(0) NOT NULL,
+    initial_condition_of_space NVARCHAR(1000) NULL,
+    actual_end_time DATETIME2(0) NULL,
+    final_condition_of_space NVARCHAR(1000) NULL,
+    usage_notes NVARCHAR(1000) NULL,
+
+    CONSTRAINT PK_USAGE_SESSION PRIMARY KEY (usage_session_id),
+    CONSTRAINT UQ_USAGE_SESSION_booking_id UNIQUE (booking_id),
+    CONSTRAINT FK_USAGE_SESSION_booking_id FOREIGN KEY (booking_id)
+        REFERENCES dbo.BOOKING_REQUEST (booking_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT FK_USAGE_SESSION_checked_in_by_user_account_id FOREIGN KEY (checked_in_by_user_account_id)
+        REFERENCES dbo.USER_ACCOUNT (user_account_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT FK_USAGE_SESSION_completed_by_user_account_id FOREIGN KEY (completed_by_user_account_id)
+        REFERENCES dbo.USER_ACCOUNT (user_account_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT CK_USAGE_SESSION_actual_time_order CHECK
+    (
+        actual_end_time IS NULL
+        OR actual_end_time > actual_start_time
+    )
+);
+GO
+
+CREATE INDEX IX_USAGE_SESSION_checked_in_by_user_account_id
+    ON dbo.USAGE_SESSION (checked_in_by_user_account_id);
+GO
+
+CREATE INDEX IX_USAGE_SESSION_completed_by_user_account_id
+    ON dbo.USAGE_SESSION (completed_by_user_account_id);
 GO
 
 CREATE TRIGGER dbo.TR_USAGE_SESSION_validate_facility_staff_roles
@@ -425,83 +467,94 @@ BEGIN
 END;
 GO
 
+CREATE TRIGGER dbo.TR_USAGE_SESSION_completion_consistency
+ON dbo.USAGE_SESSION
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS
+    (
+        SELECT 1
+        FROM inserted AS i
+        WHERE
+            (
+                i.completed_by_user_account_id IS NOT NULL
+                OR i.actual_end_time IS NOT NULL
+                OR i.final_condition_of_space IS NOT NULL
+            )
+            AND NOT
+            (
+                i.completed_by_user_account_id IS NOT NULL
+                AND i.actual_end_time IS NOT NULL
+                AND i.final_condition_of_space IS NOT NULL
+            )
+    )
+    BEGIN
+        THROW 51006, 'Completion fields completed_by_user_account_id, actual_end_time, and final_condition_of_space must be populated together.', 1;
+    END;
+END;
+GO
+
 /* ============================================================
-   6. Views supporting validated staff information needs (BR-25)
+   8. MAINTENANCE_RECORD
    ============================================================ */
 
-CREATE VIEW dbo.VW_BOOKING_HISTORY
-AS
-SELECT
-    br.booking_id,
-    br.booking_status,
-    br.requested_start_time,
-    br.requested_end_time,
-    br.purpose_of_use,
-    br.expected_number_of_participants,
-    ua.user_account_id AS requester_user_account_id,
-    ua.user_id AS requester_user_id,
-    ua.full_name AS requester_full_name,
-    sp.space_id,
-    sp.unique_space_code,
-    sp.space_name,
-    sp.current_status AS space_current_status
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.USER_ACCOUNT AS ua
-    ON ua.user_account_id = br.requester_user_account_id
-INNER JOIN dbo.SPACE AS sp
-    ON sp.space_id = br.space_id;
+CREATE TABLE dbo.MAINTENANCE_RECORD
+(
+    maintenance_record_id INT IDENTITY(1,1) NOT NULL,
+    space_id INT NOT NULL,
+    reporter_user_account_id INT NOT NULL,
+    assigned_staff_user_account_id INT NOT NULL,
+    problem_description NVARCHAR(1000) NOT NULL,
+    start_time DATETIME2(0) NOT NULL,
+    completion_time DATETIME2(0) NULL,
+    status NVARCHAR(50) NULL,
+    result_note NVARCHAR(1000) NULL,
+
+    CONSTRAINT PK_MAINTENANCE_RECORD PRIMARY KEY (maintenance_record_id),
+    CONSTRAINT FK_MAINTENANCE_RECORD_space_id FOREIGN KEY (space_id)
+        REFERENCES dbo.SPACE (space_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT FK_MAINTENANCE_RECORD_reporter_user_account_id FOREIGN KEY (reporter_user_account_id)
+        REFERENCES dbo.USER_ACCOUNT (user_account_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT FK_MAINTENANCE_RECORD_assigned_staff_user_account_id FOREIGN KEY (assigned_staff_user_account_id)
+        REFERENCES dbo.USER_ACCOUNT (user_account_id)
+        ON DELETE NO ACTION
+        ON UPDATE NO ACTION,
+    CONSTRAINT CK_MAINTENANCE_RECORD_time_order CHECK
+    (
+        completion_time IS NULL
+        OR completion_time > start_time
+    )
+);
 GO
 
-CREATE VIEW dbo.VW_UPCOMING_BOOKINGS
-AS
-SELECT
-    br.booking_id,
-    br.booking_status,
-    br.requested_start_time,
-    br.requested_end_time,
-    br.purpose_of_use,
-    ua.user_id AS requester_user_id,
-    ua.full_name AS requester_full_name,
-    sp.unique_space_code,
-    sp.space_name
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.USER_ACCOUNT AS ua
-    ON ua.user_account_id = br.requester_user_account_id
-INNER JOIN dbo.SPACE AS sp
-    ON sp.space_id = br.space_id
-WHERE br.requested_start_time >= SYSDATETIME();
+CREATE INDEX IX_MAINTENANCE_RECORD_space_id
+    ON dbo.MAINTENANCE_RECORD (space_id);
 GO
 
-CREATE VIEW dbo.VW_SPACES_UNDER_MAINTENANCE
-AS
-SELECT
-    sp.space_id,
-    sp.unique_space_code,
-    sp.space_name,
-    sp.space_type,
-    sp.building,
-    sp.floor,
-    sp.room_number,
-    sp.current_status
-FROM dbo.SPACE AS sp
-WHERE sp.current_status = 'Under maintenance';
+CREATE INDEX IX_MAINTENANCE_RECORD_reporter_user_account_id
+    ON dbo.MAINTENANCE_RECORD (reporter_user_account_id);
 GO
 
-CREATE VIEW dbo.VW_NO_SHOW_BOOKINGS
-AS
-SELECT
-    br.booking_id,
-    br.requested_start_time,
-    br.requested_end_time,
-    br.purpose_of_use,
-    ua.user_id AS requester_user_id,
-    ua.full_name AS requester_full_name,
-    sp.unique_space_code,
-    sp.space_name
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.USER_ACCOUNT AS ua
-    ON ua.user_account_id = br.requester_user_account_id
-INNER JOIN dbo.SPACE AS sp
-    ON sp.space_id = br.space_id
-WHERE br.booking_status = 'No-show';
+CREATE INDEX IX_MAINTENANCE_RECORD_assigned_staff_user_account_id
+    ON dbo.MAINTENANCE_RECORD (assigned_staff_user_account_id);
+GO
+
+-- OPEN QUESTION: What are the allowed status values and lifecycle transitions for MAINTENANCE_RECORD.status?
+-- No CHECK constraint is added because logical design §6 leaves maintenance status values unresolved.
+-- OPEN QUESTION: Which user roles are allowed to report maintenance issues?
+-- OPEN QUESTION: Which user roles are allowed to assign maintenance staff?
+-- No role-restriction trigger is added for maintenance reporter/assignee because logical design §6 leaves these unresolved.
+-- OPEN QUESTION: Does creating/starting/completing/changing MAINTENANCE_RECORD automatically change related SPACE.current_status?
+-- No synchronization trigger is added because logical design §6 leaves this unresolved.
+GO
+
+-- OPEN QUESTION: BR-25 requires staff to view booking history, upcoming bookings, spaces under maintenance, and no-show bookings, but logical design §4 says view implementation and authorization scope are deferred.
+-- No view is created because no view name or definition is specified in the logical design or validation report.
 GO

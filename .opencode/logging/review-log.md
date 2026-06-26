@@ -84,3 +84,15 @@
 
 2026-06-26 12:24:30 +07 — Reviewed SQL query design against actual DDL and sample data to ensure table/column names are valid and queries answer realistic business questions for students, lecturers, teaching assistants, facility staff, department administrators, and facility managers.
 2026-06-26 12:24:30 +07 — Confirmed output contains twelve meaningful read-only SELECT queries with joins, filters, grouping, aggregation, ordering, and required explanatory comments.
+
+2026-06-26 13:08:00 +07 — Reviewed the regenerated DDL for strict source fidelity, required table order, exact base table coverage, FK dependency safety, foreign-key-only index discipline, and absence of unsupported status/time helper indexes.
+2026-06-26 13:08:00 +07 — Applied DDL-stage Rule 7 for the approval decision outcome gap: removed the derived `APPROVAL_DECISION.decision_outcome` column and replaced same-row rejection-reason enforcement with a documented trigger using `BOOKING_REQUEST.booking_status = 'Rejected'`.
+2026-06-26 13:08:00 +07 — Removed invented BR-25 view definitions because the logical design defers view implementation and does not specify view names/definitions; preserved BR-25 as an Open Question/comment for later query/view design.
+
+2026-06-26 13:15:00 +07 — Reviewed sample data against the current DDL, especially the post-DDL Rule 7 change that removed `APPROVAL_DECISION.decision_outcome`; approval/rejection details now use booking status plus decision notes/rejection reason only.
+2026-06-26 13:15:00 +07 — Confirmed all required normal and exceptional cases are represented with stable identity IDs in the header traceability section, while avoiding any bookings for under-maintenance, temporarily closed, or retired spaces.
+2026-06-26 13:15:00 +07 — Confirmed department values are represented only through `USER_ACCOUNT.department`, and maintenance status examples are used only because the DDL leaves `MAINTENANCE_RECORD.status` unconstrained.
+
+2026-06-26 13:23:00 +07 — Reviewed SQL query design against the current DDL and sample data, including the absence of implemented views and the absence of an approval-decision outcome column.
+2026-06-26 13:23:00 +07 — Confirmed the query set covers all major staff-view topics from BR-25 plus requester-facing availability and management-facing utilization/workload summaries.
+2026-06-26 13:23:00 +07 — Confirmed each query is read-only, uses clear aliases, combines related tables with joins where appropriate, and includes required business-question comments.

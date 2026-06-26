@@ -15,6 +15,37 @@ Blocking failures remaining: none
 Delivery status: READY
 
 Run date: 2026-06-26
+Run time: 13:23:00 +07
+Run by: openai/gpt-5.5 sql-query-designer agent
+
+Input analysis: PASS — Read `outputs/05-db-definition-G03.sql` and `outputs/06-sample-data-G03.sql` as required by the SQL query designer agent; also read `outputs/01-business-req-analysis-G03.md` as requested by the command for business context and target users.
+Schema validity: PASS — Queries use implemented tables and columns only: `USER_ACCOUNT`, `SPACE`, `FACILITY`, `SPACE_FACILITY`, `BOOKING_REQUEST`, `APPROVAL_DECISION`, `USAGE_SESSION`, and `MAINTENANCE_RECORD`.
+Read-only discipline: PASS — Output contains SELECT statements only after comments; no INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, MERGE, or CREATE statements are used as executable query statements.
+Comment format: PASS — All twelve queries include the required short title, business question, target user(s), and why-this-query-is-useful comments.
+Coverage: PASS — Query set covers upcoming approved bookings, available-space search, under-maintenance spaces, no-shows, rejected booking reasons, booking counts by department/status, most active requesters, utilization summary, facilities by room, maintenance history, approval workload, and usage-session completion details.
+SQL Server syntax: PASS — Uses SQL Server-compatible SELECT, JOIN, OUTER APPLY, TOP, NOT EXISTS, CAST, DATETIME2, CASE, aggregate functions, DATEDIFF, STRING_AGG, GROUP BY, and ORDER BY.
+Business usefulness: PASS — Queries address realistic needs for students, lecturers, teaching assistants, facility staff, department administrators, and facility managers.
+
+Blocking failures remaining: none
+Delivery status: READY
+
+Run date: 2026-06-26
+Run time: 13:15:00 +07
+Run by: openai/gpt-5.5 sample-data-preparer agent
+
+Input analysis: PASS — Read `outputs/05-db-definition-G03.sql` as authoritative input and identified all implemented tables, columns, NOT NULL requirements, PKs, FKs, UNIQUE constraints, CHECK constraints, and triggers.
+Insert ordering: PASS — Inserts are ordered by dependency: `USER_ACCOUNT`, `SPACE`, `FACILITY`, `SPACE_FACILITY`, `BOOKING_REQUEST`, `APPROVAL_DECISION`, `USAGE_SESSION`, `MAINTENANCE_RECORD`.
+Implemented-schema discipline: PASS — Inserts reference only implemented tables and columns; no `DEPARTMENT` table, no views, and no `APPROVAL_DECISION.decision_outcome` column are referenced.
+Constraint compliance: PASS — Role, space status, booking purpose, and booking status values exactly match DDL CHECK constraints; unique user IDs, emails, space codes, and space-facility pairs are not duplicated; all time-order CHECK constraints are satisfied.
+Foreign-key compliance: PASS — Every referenced user, space, facility, and booking parent row exists before child rows are inserted.
+Trigger compliance: PASS — Bookings avoid spaces with Under maintenance, Temporarily closed, or Retired status; approved bookings do not overlap for the same space; approval decisions are made by Facility Staff or Facility Manager users; rejected booking_id 3 has a non-null rejection reason; usage sessions use Facility Staff for check-in/completion and satisfy completion-field grouping.
+Coverage: PASS — Includes department values via `USER_ACCOUNT.department`, all required roles, classroom/computer laboratory/project laboratory/meeting room/auditorium/student workspace examples, projector/whiteboard/microphone/computer/livestreaming equipment/air conditioner facilities, space-facility assignments, all requested booking statuses, approval/rejection details, check-in/completion details, maintenance records with varied unconstrained status values, and all required exceptional cases.
+Header traceability: PASS — Output header includes Input Analyzed, Execution Assumption, Assumptions Carried Forward, Open Questions Carried Forward, Trigger Compliance, and Sample Coverage / Traceability sections with specific IDs/codes for exceptional cases.
+
+Blocking failures remaining: none
+Delivery status: READY
+
+Run date: 2026-06-26
 Run time: 12:24:30 +07
 Run by: openai/gpt-5.5 sql-query-designer agent
 
@@ -282,3 +313,19 @@ Delivery status: READY
 - Checked that edits target `.opencode/agent/sample-data-preparer.md`, `.opencode/templates/sample-data-template.md`, and `.opencode/evaluation/sample-data-rubric.md`, not `outputs/06-sample-data-G03.sql`.
 - Confirmed the new agent rules require reading full DDL including triggers, using only implemented tables/columns, documenting department-as-column behavior when no `DEPARTMENT` table exists, and mapping exceptional cases to inserted IDs.
 - Confirmed the new template and rubric require assumptions, open questions, trigger compliance, coverage traceability, SQL Server syntax, FK/order validity, and clean-schema execution assumption.
+
+Run date: 2026-06-26
+Run time: 13:08:00 +07
+Run by: openai/gpt-5.5 database-definition-implementation-engineer agent
+
+Rubric availability: CONDITIONAL PASS — `.opencode/evaluation/ddl-implementation-rubric.md` / DDL rubric file was not present in `.opencode/evaluation/`; self-check was performed against the database-definition implementation instructions and mandatory rules in the active agent prompt.
+Source discipline: PASS — Used `outputs/03-logical-design-G03.md` and `outputs/04-design-validation-G03.md` as authoritative schema inputs; documented the DDL-stage Rule 7 exception for the logical design's derived `decision_outcome` column.
+Table order and coverage: PASS — Implemented exactly the required base tables in order: `USER_ACCOUNT`, `SPACE`, `FACILITY`, `SPACE_FACILITY`, `BOOKING_REQUEST`, `APPROVAL_DECISION`, `USAGE_SESSION`, `MAINTENANCE_RECORD`.
+Constraint coverage: PASS WITH DOCUMENTED EXCEPTION — Implemented named PK/FK/UQ/CHECK constraints from the logical design except the `decision_outcome`-dependent APPROVAL_DECISION CHECKs, which are not implementable under DDL-stage Rule 7 because no `decision_outcome` column may be added.
+Index discipline: PASS — Nonclustered indexes are limited to foreign-key columns not already covered by leading PK/UQ keys; no unsupported status/time/helper indexes remain.
+Implementation logic coverage: PASS — Added triggers for unavailable-space booking prevention, approved overlap prevention, approval-maker role validation, rejection-reason enforcement using `BOOKING_REQUEST.booking_status`, usage-session staff role validation, and completion-field consistency.
+Open-question discipline: PASS — Carried forward account status values, maintenance status values, maintenance-to-space-status sync, maintenance role permissions, cancellation/no-show transitions, approval workflow bypass, approval-decision cardinality, capacity comparison, staff-view scope, and BR-25 view-definition ambiguity as comments without enforcing unsupported rules.
+Unsupported additions check: PASS — No unsupported allowed-value CHECKs, `UQ_APPROVAL_DECISION`, `decision_outcome` column, or invented BR-25 views remain in the DDL.
+
+Blocking failures remaining: none
+Delivery status: READY
