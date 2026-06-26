@@ -36,3 +36,10 @@
 2026-06-25 13:50:00 +07 — Analyzed implemented table names, columns, joins, constraints, sample records, and target user groups from the shared campus space booking context.
 2026-06-25 13:50:00 +07 — Wrote ten read-only Microsoft SQL Server SELECT queries to `outputs/07-query-design-G03.sql` with required business question, target user, and usefulness comments.
 2026-06-25 13:50:00 +07 — Verified the query file uses actual schema names and contains only read-only SELECT statements separated by GO batches.
+## 2026-06-26 - Fix sample-data agent instructions
+
+- Ran `Get-ChildItem -Force` to inspect repository root before assuming files exist.
+- Ran recursive file listing to locate agent, template, rubric, logging, and output files.
+- Read  `.opencode/agent/sample-data-preparer.md`, `.opencode/templates/sample-data-template.md`, `.opencode/evaluation/sample-data-rubric.md`, `outputs/05-db-definition-G03.sql`, and `outputs/06-sample-data-G03.sql`.
+- Reasoning summary: the current sample output appears constraint-valid, but the sample-data agent/template/rubric lack explicit requirements for metadata traceability, carried assumptions/open questions, trigger compliance, unsupported department table handling, and coverage mapping. Per user request, fixed the source agent guidance rather than editing `outputs/06-sample-data-G03.sql`.
+

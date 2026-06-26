@@ -41,3 +41,8 @@ SQL Server syntax: PASS — Uses SQL Server-compatible joins, filters, aggregati
 
 Blocking failures remaining: none
 Delivery status: READY
+## 2026-06-26 - Sample data stage instruction fix
+
+- Checked that edits target `.opencode/agent/sample-data-preparer.md`, `.opencode/templates/sample-data-template.md`, and `.opencode/evaluation/sample-data-rubric.md`, not `outputs/06-sample-data-G03.sql`.
+- Confirmed the new agent rules require reading full DDL including triggers, using only implemented tables/columns, documenting department-as-column behavior when no `DEPARTMENT` table exists, and mapping exceptional cases to inserted IDs.
+- Confirmed the new template and rubric require assumptions, open questions, trigger compliance, coverage traceability, SQL Server syntax, FK/order validity, and clean-schema execution assumption.
