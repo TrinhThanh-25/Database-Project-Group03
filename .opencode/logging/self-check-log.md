@@ -602,3 +602,49 @@ H1: PASS — Implementation needs and risks are identified for overlap preventio
 
 Blocking failures remaining: none
 Final decision: ACCEPTED WITH CONDITIONS
+## Database Definition Implementation Self-Check — 2026-06-29 17:34:19 +07
+
+Run date: 2026-06-29
+Run time: 17:34:19 +07
+Run by: openai/gpt-5.5 database-definition-implementation-engineer
+Output file: outputs/05-db-definition-G03.sql
+
+A1-A5: PASS — All 8 required tables are present in the required order; every logical-design column is present with matching SQL Server type and nullability; no unsupported columns or constraints were added; all named PK/FK/UQ/CHECK constraints from the logical design are present with exact names; role-playing FK columns remain distinct (`checked_in_by_user_account_id` / `completed_by_user_account_id`, `reporter_user_account_id` / `assigned_staff_user_account_id`).
+B1-B2: PASS — All 7 mandatory implementation stubs/triggers are present: `TR_BOOKING_REQUEST_NoOverlap`, `TR_BOOKING_REQUEST_SpaceAvailability`, `TR_APPROVAL_DECISION_RoleCheck`, `TR_APPROVAL_DECISION_RejectionReason`, `TR_USAGE_SESSION_CheckInRoleCheck`, `TR_USAGE_SESSION_CompletionRoleCheck`, and `TR_USAGE_SESSION_CompletionConsistency`; open questions from logical §6 and mandatory carried-forward questions are represented as `-- OPEN QUESTION` blocks in the file header and relevant table locations.
+C1-C2: PASS — Header carries upstream assumptions and `[ddl-stage]` assumptions, including IDENTITY choice, FK indexes, trigger shells, drop/recreate sequence, and input/rubric path discrepancies; table creation order follows USER_ACCOUNT → SPACE → FACILITY → SPACE_FACILITY → BOOKING_REQUEST → APPROVAL_DECISION → USAGE_SESSION → MAINTENANCE_RECORD.
+D1-D4: PASS — `GO` separators are used after major batches; text columns use `NVARCHAR`, time columns use `DATETIME2(0)`; trigger shells are syntactically valid SQL Server `CREATE TRIGGER` batches; script includes a documented drop/recreate sequence.
+
+Blocking failures remaining: none
+Delivery status: READY
+## Sample Data Preparation Self-Check — 2026-06-29 17:42:53 +07
+
+Run date: 2026-06-29
+Run time: 17:42:53 +07
+Run by: openai/gpt-5.5 sample-data-preparer
+Output file: outputs/06-sample-data-G03.sql
+
+Schema fidelity: PASS — Uses only implemented DDL tables/columns from `outputs/05-db-definition-G03.sql`; no DEPARTMENT or other unsupported lookup table is created; no schema DDL is included.
+Constraint validity: PASS — Inserts follow parent-to-child order; all FK references target deterministic clean-schema identity values; unique user IDs, emails, space codes, and space-facility pairs are non-duplicated; all NOT NULL fields are populated; CHECK values match DDL; date/time ordering constraints are satisfied.
+Trigger compliance: PASS — Header lists every DDL trigger and compliance approach. Approved bookings do not overlap for the same space; bookings do not reference under-maintenance/temporarily closed/retired spaces; approval decision makers are Facility Staff/Facility Manager; rejected decision has a rejection reason; usage sessions use Facility Staff actors and satisfy completion consistency.
+Coverage: PASS — Covers all implemented user roles, required space types, facility examples, space-facility assignments, all booking statuses, approved/rejected decisions, completed and in-progress usage sessions, unavailable spaces, and varied maintenance statuses.
+Traceability/documentation: PASS — Header includes input analyzed, execution assumptions, assumptions/open questions, trigger compliance, and sample coverage mapped to inserted IDs/codes.
+Load behavior: PASS — Documented clean-schema assumption after running DDL; no nondeterministic dates; script uses SQL Server syntax and explicit column lists.
+
+Blocking failures remaining: none
+Delivery status: READY
+## SQL Query Design Self-Check — 2026-06-29 17:49:08 +07
+
+Run date: 2026-06-29
+Run time: 17:49:08 +07
+Run by: openai/gpt-5.5 sql-query-designer
+Output file: outputs/07-query-design-G03.sql
+
+Schema fidelity: PASS — Queries use actual implemented table and column names from `outputs/05-db-definition-G03.sql`.
+Read-only rule: PASS — The output contains SELECT statements only and no INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE statements.
+Minimum query count: PASS — 10 meaningful queries are included.
+Comment format: PASS — Each query has title, business question, target users, usefulness explanation, and an outputs-format marker as SQL comments.
+Business relevance: PASS — Queries cover upcoming bookings, availability, unavailable spaces, no-shows, rejections, booking counts, utilization, high-use requesters, facility inventory, and maintenance history.
+Join/filter/group/order usage: PASS — Queries use joins, filtering, grouping, aggregation, ordering, and SQL Server functions where useful.
+
+Blocking failures remaining: none
+Delivery status: READY

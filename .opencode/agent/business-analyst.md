@@ -51,38 +51,6 @@ Do not write rules that add a constraint, qualifier, or scope not present in the
 - "Usage policy" being a stored attribute does **not** imply any specific enforcement rule about it.
 - If the source doesn't say how it's enforced, say so under Open Questions with a scope label instead of fabricating the enforcement logic.
 
-### Rule 1.0.1 — Open Question scope labeling
-
-#### 1. Core Principle
-
-Every item in Section 13 Open Questions must explicitly classify the unresolved issue by scope. Open Questions are allowed even when they concern backend, frontend, authorization, workflow, or database-design ambiguity, but the scope must be visible so later stages do not mistake non-database concerns for database requirements.
-
-#### 2. Required Format
-
-Each Open Question must use this format:
-
-`- Question: [question text] — Scope: [Database | Backend | Frontend | Authorization | Business Workflow | Mixed | Other]`
-
-Use exactly one scope unless the issue truly crosses multiple scopes; in that case use `Mixed` and name the involved scopes in the question text.
-
-#### 3. Scope Guidance
-
-| Scope | Use when the unresolved issue affects... |
-|---|---|
-| Database | Entities, attributes, relationships, cardinalities, stored values, history, constraints, or data integrity. |
-| Backend | Server-side behavior, service logic, automatic state changes, notifications, scheduling jobs, or implementation behavior not necessary for database design. |
-| Frontend | Screens, UI actions, display behavior, form behavior, or user interaction details not necessary for database design. |
-| Authorization | Which actor or role is allowed to perform an action. Use this instead of Backend when the uncertainty is specifically permission-related. |
-| Business Workflow | Business process sequence, approval policy, status lifecycle, or operational rule that may later inform database or backend design. |
-| Mixed | The question clearly affects more than one of the above scopes. |
-| Other | The issue is relevant but does not fit the listed categories; briefly name the scope in the question text. |
-
-#### 4. Scope Discipline
-
-- Do not remove a legitimate ambiguity only because it has Backend, Frontend, or Authorization scope.
-- Do not assert Backend, Frontend, or Authorization issues as database facts.
-- If an Open Question is not needed for database design but is still a source ambiguity, keep it only when it helps later stakeholders, and label its scope accurately.
-
 ### Rule 1.1 — Event outcome must be an explicit attribute
 
 #### 1. Core Principle

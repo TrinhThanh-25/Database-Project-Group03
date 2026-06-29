@@ -171,3 +171,23 @@ Review comments:
 - Reviewed single-actor relationships across decision-maker, check-in, completion, reporter, and assignment: all have at-most-one actor per event occurrence.
 - Reviewed logical design constraints: surrogate INT PK standardization, demoted natural keys with UNIQUE, INT FK type matching, explicit referential actions, named constraints, in-row time-order checks, and rejected-reason CHECK all pass.
 - Reviewed implementation risks: overlap prevention, unavailable-space booking, role restrictions, maintenance status/synchronization, account status values, and capacity comparison remain conditions or open questions rather than design defects.
+## Database Definition Implementation Review — 2026-06-29 17:34:19 +07
+
+- Reviewed DDL against logical §2 table by table: column names, SQL Server data types, nullability, and named constraints are preserved.
+- Reviewed source fidelity: no CHECK was added for `USER_ACCOUNT.account_status`, `SPACE.space_type`, `FACILITY.facility_name`, or `MAINTENANCE_RECORD.status` because the logical design leaves those unconstrained/open.
+- Reviewed relationship implementation: all FKs target surrogate `INT` primary keys, `APPROVAL_DECISION.booking_id` remains non-unique, and `USAGE_SESSION.booking_id` has `UQ_USAGE_SESSION_booking_id`.
+- Reviewed implementation logic coverage: overlap, unavailable-space booking, approver role, rejection reason, check-in role, completion role, and completion consistency stubs/triggers are present.
+- Reviewed open questions: usage-policy enforcement, booking status transitions, approval workflow, maintenance status/synchronization, maintenance roles, account status, and participant-capacity comparison are not silently resolved.
+- Reviewed index scope: only FK-column nonclustered indexes were added, recorded as a `[ddl-stage]` assumption.
+## Sample Data Preparation Review — 2026-06-29 17:42:53 +07
+
+- Reviewed sample rows against DDL CHECK constraints for roles, space statuses, booking statuses, purpose values, decision outcomes, positive counts, and chronological time ordering.
+- Reviewed trigger compliance: no approved booking overlaps another approved booking for the same space; no booking references unavailable spaces; decision and usage-session actors satisfy role triggers.
+- Reviewed exceptional-case coverage: rejected with reason, cancelled, no-show, completed usage, checked-in/in-progress usage, space under maintenance, temporarily closed space, retired space, and varied purposes/participant counts are included.
+- Reviewed dependency order and FK parent existence for users, spaces, facilities, space-facility assignments, bookings, approval decisions, usage sessions, and maintenance records.
+## SQL Query Design Review — 2026-06-29 17:49:08 +07
+
+- Reviewed every query against implemented DDL table/column names.
+- Reviewed read-only compliance: no data modification or schema modification statements are present.
+- Reviewed business coverage: included queries for students/lecturers, facility staff, department administrators, and facility managers.
+- Reviewed sample-data compatibility: filters such as `S-CLS-101` and `S-PRJ-204` match sample records, while queries remain generally runnable on the implemented schema.

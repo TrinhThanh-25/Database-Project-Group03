@@ -282,3 +282,29 @@ Reasoning summary:
 - Ran Grep checks on the validation report for fragile line citations and fabricated booking type/category wording, and for required validation markers including `ACCEPTED WITH CONDITIONS`, the business rule matrix header, `CK_APPROVAL_DECISION_rejection_reason`, `UQ_USAGE_SESSION_booking_id`, and `APPROVAL_DECISION.booking_id`.
 - Ran `date '+%Y-%m-%d %H:%M:%S %Z'` to timestamp the run.
 - Ran `git diff --stat -- "outputs/04-design-validation-G03.md" ".opencode/logging/self-check-log.md" ".opencode/logging/run-command-log.md" ".opencode/logging/review-log.md"` to inspect changed files.
+## Database Definition Implementation Run — 2026-06-29 17:34:19 +07
+
+- Ran `ls -la outputs/ && ls -la .opencode/agent .opencode/evaluation .opencode/templates` to confirm required inputs and implementation support files before reading.
+- Read `.opencode/agent/database-definition-implementation-engineer.md`, `.opencode/evaluation/ddl-rubric.md`, `.opencode/templates/ddl-template.md`, `outputs/03-logical-design-G03.md`, and `outputs/04-design-validation-G03.md`.
+- Noted command path mismatch: requested `.opencode/agent/database-implementation-engineer.md` does not exist; used available `.opencode/agent/database-definition-implementation-engineer.md` and documented this as a `[ddl-stage]` assumption in the SQL header.
+- Noted rubric path mismatch: agent mentions `.opencode/evaluation/ddl-implementation-rubric.md`, but repository contains `.opencode/evaluation/ddl-rubric.md`; used available rubric and documented this as a `[ddl-stage]` assumption.
+- Wrote `outputs/05-db-definition-G03.sql` with SQL Server DDL, named constraints, FK indexes, trigger stubs/enforcement shells, assumptions, and open-question blocks.
+- Ran a Python consistency check over `outputs/05-db-definition-G03.sql` confirming all 8 tables, all required constraint names, all 7 trigger/stub names, 18 open-question blocks, and 12 FK indexes are present.
+- Ran `date '+%Y-%m-%d %H:%M:%S %Z'` to timestamp the run.
+- Ran `git diff --stat -- "outputs/05-db-definition-G03.sql" ".opencode/logging/self-check-log.md" ".opencode/logging/run-command-log.md" ".opencode/logging/review-log.md"` to inspect changed files.
+## Sample Data Preparation Run — 2026-06-29 17:42:53 +07
+
+- Read `.opencode/agent/sample-data-preparer.md`, `.opencode/evaluation/sample-data-rubric.md`, `.opencode/templates/sample-data-template.md`, and `outputs/05-db-definition-G03.sql`.
+- Analyzed DDL tables, constraints, FKs, CHECK values, trigger rules, and open-question comments.
+- Wrote `outputs/06-sample-data-G03.sql` with explicit column-list INSERTs in dependency order and a detailed coverage/trigger-compliance header.
+- Ran a Python consistency check confirming required header sections, all 8 table INSERT sections, all 7 trigger names, and all booking statuses are present in the sample-data script.
+- Ran `date '+%Y-%m-%d %H:%M:%S %Z'` to timestamp the run.
+- Ran `git diff --stat -- "outputs/06-sample-data-G03.sql" ".opencode/logging/self-check-log.md" ".opencode/logging/run-command-log.md" ".opencode/logging/review-log.md"` to inspect changed files.
+## SQL Query Design Run — 2026-06-29 17:49:08 +07
+
+- Read `.opencode/agent/sql-query-designer.md`, `outputs/01-business-req-analysis-G03.md`, `outputs/05-db-definition-G03.sql`, and `outputs/06-sample-data-G03.sql`.
+- Designed 10 Microsoft SQL Server read-only SELECT queries for the implemented campus space booking schema.
+- Wrote `outputs/07-query-design-G03.sql` with required per-query comments and SQL statements.
+- Ran a Python consistency check confirming 10 query blocks, absence of data modification statements, and use of all implemented major tables.
+- Ran `date '+%Y-%m-%d %H:%M:%S %Z'` to timestamp the run.
+- Ran `git diff --stat -- "outputs/07-query-design-G03.sql" ".opencode/logging/self-check-log.md" ".opencode/logging/run-command-log.md" ".opencode/logging/review-log.md"` to inspect changed files.
