@@ -1,14 +1,20 @@
 # Business Requirement Analysis - Group 03
 
-## 1. Source Documents
+## 1. Introduction
 
-- Requested input: [path as named in the command spec]
-- Actual input used: [path actually found via `ls -la`]
-- Target system: [system name]
+This document presents the business requirement analysis for the [System Name] project. The analysis is based on the information gathered from stakeholders and the source documents.
 
 ## 2. Business Context
 
+### 2.1 System Overview
+
 [2-4 sentences grounded in Layer A.]
+
+### 2.2 Term Definition
+
+- [Term 1]: [Definition]
+- [Term 2]: [Definition]
+- ...
 
 ## 3. System Actors
 

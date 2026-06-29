@@ -1,9 +1,8 @@
 # Conceptual Database Design - Group 03
 
-## 1. Source Documents
+## 1. Introduction
 
-- Requested input: [path as named in the command spec]
-- Actual input used: [path actually found via `ls -la`]
+This document outlines the conceptual database design for the [System Name] project. The design is based on the business requirements and use cases gathered during the requirement analysis phase.
 
 ## 2. Conceptual ERD
 

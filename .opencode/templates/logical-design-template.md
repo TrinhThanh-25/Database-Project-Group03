@@ -2,15 +2,9 @@
 
 Use this template for `outputs/03-logical-design-G03.md`.
 
-## 1. Source Documents and Path Discrepancies
+## 1. Introduction
 
-- Project routing contract read: `AGENTS.md`
-- Logical designer definition read: `.opencode/agent/logical-database-designer.md`
-- Required conceptual input per contract: `outputs/02-erd-design-G03.md`
-- Actual conceptual input used: `outputs/02-erd-design-G03.md`
-- Traceability input used: `outputs/01-business-req-analysis-G03.md`
-- Target DBMS: Microsoft SQL Server
-- Path discrepancies: `[None / describe mismatch]`
+This document presents the logical database design for the [System Name] project. The design is based on the conceptual schema and business requirements analyzed in the previous phase.
 
 ## 2. Relational Schema
 

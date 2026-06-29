@@ -18,6 +18,8 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 | A4 | No invented entities, attributes, relationships, cardinalities, or constraints are present in the conceptual design | Confirm that all elements in the design are supported by the source document and that no additional elements have been added |
 | A5 | §4 Cardinality column uses a uniform A→B orientation on every row | Read the `Cardinality` value of each row against its `Entity A` / `Entity B` columns. FAIL if any row flips the order (e.g. an Entity-A=User row reading `0..* to 0..1` while sibling User rows read `1 to 0..*`), even when the prose direction is correct. |
 | A6 | Mermaid diagram cardinality symbols agree with §4 | For each relationship, confirm the Mermaid symbol's optional/mandatory and one/many sides match the §4 participation text. |
+| A7 | Single-actor relationships allow at most one actor per event, uniformly across the same-pattern group | For every relationship realized by one actor FK on an event/record entity (`CHECKED_IN_BY`, `COMPLETED_BY`, `REPORTED_BY`, `ASSIGNED_TO`, decision-maker), confirm the actor-per-event maximum is `1`. FAIL if any allows many actors per one event (`0..*`/`1..*` on the actor-per-event side); a single role column cannot hold many actors and the "silent max → `*`" default does not apply to that side. The group must share this maximum; only participation may differ, and only with a creation-time basis. (Reference defect: `COMPLETED_BY` many-per-session while `CHECKED_IN_BY` one-per-session.) |
+| A8 | No entity carries a `type`/`category` attribute that only duplicates another attribute's value list | Scan each entity for value-list over-splitting. `BOOKING_REQUEST` must have exactly one purpose attribute (`purpose_of_use`) holding the lecture/examination/seminar/… value set; FAIL if a `booking_type`/`booking_category` attribute (fabricated — the source never names a booking "type") also appears or carries the value list instead. |
 
 ## B. Workflow and Relationship between Entities (Blocking) — corresponds to Workflow steps 7–8
 
@@ -40,7 +42,7 @@ Run date: [date]
 Run time: [time]
 Run by: [agent / human reviewer]
 
-A1-A6: [PASS/FAIL each] — [note]
+A1-A8: [PASS/FAIL each] — [note]
 B1-B2: [PASS/FAIL each] — [note]
 C1: [PASS/FAIL] — [note]
 

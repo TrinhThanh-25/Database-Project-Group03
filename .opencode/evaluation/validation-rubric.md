@@ -29,6 +29,7 @@ Verify that the business requirement analysis accurately captures the original b
 | A7 | Assumptions and open questions are explicitly documented | Both sections are present and non-empty where applicable. |
 | A8 | No unsupported business requirements are introduced | No rule/attribute is asserted beyond what the source supports. |
 | A9 | Cancelled/No-show transitions are correctly classified, not flagged as a defect | The analysis lists `Cancelled`/`No-show` as status values but does not assert their transition triggers, carrying the missing trigger/role as a scoped Open Question (application/backend-layer). The reviewer treats this as accepted handling, **not** a data-modeling gap; report a finding only if the analysis instead asserted an ungrounded transition rule or mis-scoped the question. |
+| A10 | No fabricated value-list/`type` attribute is present or affirmed | The analysis carries exactly one purpose attribute (`purpose_of_use`) with its value list, not a duplicate `booking_type`/`booking_category` — the source never names a booking "type". FAIL the analysis if both appear or the value list is on a type/category attribute. The reviewer must also not, in its own report, restate the source as naming a booking "type" (e.g. "users submit bookings with … purpose, type, and status"); verify every "covered" attribute against the actual source wording. |
 
 ## B. Conceptual Database Design Validation (Blocking)
 
@@ -44,6 +45,8 @@ Verify that the ERD correctly represents the business domain.
 | B6 | Many-to-many relationships are modeled correctly | M:N relationships are represented as such. |
 | B7 | Important business concepts are represented | No major concept is dropped. |
 | B8 | No unnecessary entities are introduced | No invented entity is present. |
+| B9 | Single-actor relationships allow at most one actor per event | Every relationship realized by one actor FK on an event/record entity (`CHECKED_IN_BY`, `COMPLETED_BY`, `REPORTED_BY`, `ASSIGNED_TO`, decision-maker) has an at-most-one actor-per-event maximum. FAIL if any allows many actors per one event (`0..*`/`1..*` on the actor-per-event side); "the source does not say the actor is stored" is not a valid basis for a many maximum. Sibling single-actor relationships share this maximum; only participation may differ. Sweep every such relationship. (Reference defect: `COMPLETED_BY` many-per-session vs `CHECKED_IN_BY` one-per-session.) |
+| B10 | Singleton-by-nature cardinality is resolved, and its unique-FK realization is not mis-flagged | A clearly singleton relationship (Booking Request → Usage Session) is resolved upstream as `0..1` (Assumption) and realized by a unique FK (`USAGE_SESSION.booking_id` UNIQUE); this UNIQUE is correct, not an over-restriction, and is distinct from the accumulating non-unique `APPROVAL_DECISION.booking_id`. FAIL only if the singleton was left permissive/unresolved upstream, or a genuinely accumulating many-side is collapsed by UNIQUE. |
 
 ## C. Logical Database Design Validation (Blocking)
 
@@ -74,7 +77,7 @@ Verify that the schema supports the required integrity constraints.
 | D6 | Referential integrity is preserved | All references resolve to valid parent rows. |
 | D7 | Every FK declares explicit, consistently-reasoned referential actions | Each FK states both `ON DELETE` and `ON UPDATE`, with the criterion behind the choice present and applied consistently across all FKs (junction associations CASCADE on delete; references to historical/master data RESTRICT/NO ACTION on delete to preserve history; `ON UPDATE NO ACTION` uniformly because all PKs are immutable `INT` surrogates). Report any FK missing an action or with absent/inconsistent reasoning. |
 | D8 | Every constraint is named; no in-row rule is prose-only | All CHECK/UNIQUE/FK/PK constraints have explicit names. Any conditional rule expressible as a single-row CHECK is a named constraint — the rejected-decision rule must be a named `CK_APPROVAL_DECISION_rejection_reason`, not prose. Only genuine cross-row/cross-table rules may stay prose-only as implementation logic. |
-| D9 | Many-side cardinality is not silently restricted by UNIQUE | No `0..*` (many-side) FK carries a UNIQUE that collapses it to `0..1`. `APPROVAL_DECISION.booking_id` is non-unique (matching conceptual `HAS_DECISION` `1 to 0..*`) unless an explicit requirement forces one decision per booking; an unjustified UNIQUE is reported. |
+| D9 | Many-side cardinality is not silently restricted by UNIQUE | No `0..*` (many-side) FK carries a UNIQUE that collapses it to `0..1`. `APPROVAL_DECISION.booking_id` is non-unique (matching conceptual `HAS_DECISION` `1 to 0..*`) unless an explicit requirement forces one decision per booking; an unjustified UNIQUE is reported. Conversely, a UNIQUE on `USAGE_SESSION.booking_id` is **correct** — it realizes the resolved singleton `HAS_USAGE_SESSION` (`1 to 0..1`), not a collapse — and must not be reported as an over-restriction (see B10). Distinguish the accumulating case (report unjustified UNIQUE) from the resolved-singleton case (UNIQUE is the right realization). |
 | D10 | Primary keys are standardized to surrogate INTEGER keys | Every entity's PK is a surrogate `INT`; every former natural-key column (`user_id`, `unique_space_code`) is preserved as an attribute with a named `UNIQUE` constraint; every FK references the correct surrogate `INT` PK with a matching `INT` type. Report any table that still uses a string/natural PK, any missing UNIQUE on a demoted natural key, or any FK still pointing at a natural key. |
 
 ## E. Business Rule Validation (Blocking)
@@ -198,7 +201,8 @@ The final decision must be supported by the evaluation results and identified is
 ## Grading Discipline
 
 - A top-range grade (A / A-, or any "excellent, no significant issues" rating) for the logical or conceptual design is not permitted while basic enforceable-without-trigger constraints are missing or unverified: in-row CHECK ordering constraints (D3), constraint-strength consistency (D5), FK/PK data-type matching (D2), uniform cardinality notation (G7), explicit and consistently-reasoned FK referential actions (D7), complete constraint naming with no prose-only in-row rule (D8), non-over-restricted many-side cardinality (D9), and surrogate-INTEGER primary-key standardization with demoted natural keys preserved as UNIQUE (D10). Verify each before settling on a grade.
-- Do not state "no … issue was found" for any criterion you did not actually check. Thorough coverage of trigger-level rules (overlap, role, cross-table) does not substitute for checking the simple in-row constraints; let the grade reflect any that are missing.
+- A top-range grade for the requirement analysis or conceptual design is not permitted while the fabricated value-list/`type` attribute scan (A10), the single-actor / role-FK cardinality scan (B9), and the singleton-by-nature resolution check (B10) are unperformed or failing. Correctly catching one cardinality mismatch does not substitute for the full B9 sweep across every single-actor relationship, nor excuse skipping A10 and B10.
+- Do not state "no … issue was found" for any criterion you did not actually check. Thorough coverage of trigger-level rules (overlap, role, cross-table) does not substitute for checking the simple in-row constraints, the attribute value-list scan, and the cardinality sweeps; let the grade reflect any that are missing.
 
 ---
 
@@ -211,8 +215,8 @@ Run date: [date]
 Run time: [time]
 Run by: [agent / human reviewer]
 
-A1-A9: [PASS/FAIL each] — [note]
-B1-B8: [PASS/FAIL each] — [note]
+A1-A10: [PASS/FAIL each] — [note]
+B1-B10: [PASS/FAIL each] — [note]
 C1-C8: [PASS/FAIL each] — [note]
 D1-D10: [PASS/FAIL each] — [note]
 E1-E2: [PASS/FAIL each] — [note]

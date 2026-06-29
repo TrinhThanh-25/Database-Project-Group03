@@ -108,6 +108,12 @@ An explicit outcome attribute does not duplicate any fact already assigned elsew
 
 The source names the outcome values inside a conditional ("when approved **or rejected**") rather than listing the outcome as a stored fact alongside the explicitly stored items (decision maker, decision time, decision note). Adding `decision_outcome` is therefore an inference, not a verbatim extraction. Per the global *Consistent inference labeling* rule in `AGENTS.md`, you must mark it the same way a proposed surrogate identifier is marked (e.g. `[proposed — derived from the source's "approved or rejected" conditional, not stated as a stored fact]`) and record it under Assumptions. Do not add it silently while other proposed elements on the document carry an inference tag — that asymmetry is the defect this clause exists to prevent.
 
+#### 6. Cases not apply
+
+Just apply if it help to improve performance: For example, decision outcome is add to Approval Decision entity, which is the same as status of Booking Request entity and it help to improve performance of query that the Approval Decision entity do not need to join to Booking Request entity to get the status of the booking request. It is a derived attribute, but it is still a fact about the Approval Decision event.
+
+In other cases, if the outcome is already stored as a fact on the same entity (e.g., `Booking Request.status`), do not add a duplicate attribute to another entity (e.g., `Approval Decision.decision_outcome`) — that would violate Rule 3 (Single source of truth). An do not duplicate attribute in the same entity (e.g., `Booking Request.status` and `Booking Request.booking_status`) — that would violate Rule 3 (Single source of truth).
+
 ### Rule 2 — Attributes must be business properties, not relationship references
 
 #### 1. Core Principle
@@ -173,6 +179,33 @@ This rule also applies within a single entity. If two attributes of the same ent
 #### 5. Prohibition
 
 **Never** silently include both attributes without comment.
+
+#### 6. Attribute/value-list over-splitting check
+
+When the source first names a stored attribute and then immediately gives allowed/example values for that same concept, do **not** create a second category/type attribute for the values.
+
+Before adding any attribute with a name like `type`, `category`, `kind`, or `classification`, ask:
+> *"Did the source explicitly name this as a separate stored fact, or is it only listing possible values for an attribute already named in the previous sentence?"*
+
+If the source only lists possible values for an already named attribute:
+- Keep the original named attribute.
+- Put the values under `Possible [attribute name] values`.
+- Do **not** add a separate category/type attribute.
+
+Required example:
+- Source: "Users can submit booking requests by selecting ... purpose of use... A booking may be for a lecture, examination, seminar, workshop, meeting, student activity, or administrative event."
+- Correct: `Booking Request` has `purpose of use`; the listed items are possible `purpose of use` values.
+- Incorrect: adding both `purpose of use` and `booking category` / `booking type`, because that splits one source fact into two attributes.
+
+#### 7. Mandatory pre-delivery scan (Blocking)
+
+Before delivering Section 4, scan every entity for the over-splitting pattern in §6. The Booking Request case is the canonical reference defect and must be checked explicitly every run:
+
+- The source names exactly one purpose attribute — `purpose of use`. The words "type", "category", "kind", and "classification" never appear for a booking anywhere in the source text. A `booking type` / `booking category` attribute is therefore **fabricated by definition**: it (a) invents a word the source never uses and (b) duplicates the concept already held by `purpose of use`.
+- The allowed-value list ("lecture, examination, seminar, workshop, meeting, student activity, administrative event") MUST be attached to `purpose of use` as its `Possible purpose of use values`. It must **never** be attached to a separate `booking type` / `booking category` attribute.
+- Delivering Booking Request with **both** `purpose of use` and any `booking type` / `booking category` attribute, OR with the value list attached to a type/category attribute instead of to `purpose of use`, is a **Blocking** failure. Remove the fabricated attribute, keep the value list on `purpose of use`, and record the correction under Assumptions before delivery.
+
+This scan is not limited to Booking Request: apply the same removal to any `type`/`category`/`kind`/`classification` attribute on any entity that merely restates the value list of an attribute already named in the source.
 
 ### Rule 4 — Distinct actions get distinct relationships
 
@@ -284,21 +317,102 @@ This is a stricter, layer-aware version of Rule 1:
 - Layer A is the primary source for Section 2 (Business Context) and may inform problem-statement framing of Open Questions, but must not be cited as the basis for any row in Section 6 (Business Rules) or Section 11 (Traceability Matrix).
 - Final check: for every Business Rule written, confirm its source sentence sits in Layer B. If it only traces to Layer A, demote it to an Open Question.
 
-### Rule 8 — Cardinality justification
+### Rule 8 — Cardinality AND participation must be source-exact
 
 #### 1. Core Requirement
 
-For every relationship in Section 5, you must write a one-sentence justification explaining why the chosen cardinality is correct based on the source text.
+For every relationship in Section 5, record BOTH dimensions separately, and justify each from the source:
+- **Multiplicity**: is each side "one" or "many"?
+- **Participation**: is each side **mandatory** (must always be linked) or **optional** (may exist with zero link)?
 
-#### 2. Two Questions Before Deciding
+Write the cardinality using min..max notation per side (e.g. `1..1`, `0..1`, `1..*`, `0..*`) — NOT the coarse `1:M` / `M:N` form. The coarse form hides participation and is a defect at the analysis stage, because participation (whether a link can be absent) is itself a business fact the analyst must extract, not a presentation detail to defer.
 
-1. Can one instance of Entity A be linked to many instances of Entity B? → A is the "one" side.
-2. Can one instance of Entity B also be linked to many instances of Entity A? → the relationship is many-to-many.
+#### 2. Four Questions Before Deciding (answer all four, per relationship)
 
-#### 3. Special Case — Facilities
+For a relationship between A and B:
+1. Can one A link to MANY B, or at most one? → sets B-side max (`*` or `1`).
+2. Can one B link to MANY A, or at most one? → sets A-side max (`*` or `1`).
+3. Must every A have at least one B, or can an A exist with zero B? → sets A-side min (`1` or `0`).
+4. Must every B have at least one A, or can a B exist with zero A? → sets B-side min (`1` or `0`).
 
-- A facility type (e.g., projector) may exist in multiple spaces, and a space may have multiple facility types.
-- Unless the source text explicitly states that a facility item is unique to one space, model the Space-Facility relationship as **many-to-many**.
+#### 3. Silence Rule (the anti-fabrication guard)
+
+For EACH of the four answers, apply the Rule 1 test: *"Does the source state this limit, or am I inferring it?"*
+
+- If the source **explicitly** states the limit (e.g. "each booking selects exactly one space") → use the restrictive value (`1`) and cite the sentence.
+- If the source is **silent** on a max → default to the permissive `*`, never to `1` — UNLESS the child entity is singleton-by-nature per §7, in which case a max of `1` is permitted only when recorded as an explicit Assumption. Asserting `0..1` or `1..1` on a side the source did not limit, without either an explicit source statement or a §7 singleton-by-nature Assumption, is a fabricated upper bound — forbidden.
+- If the source is **silent** on a min → default to the permissive `0` (optional), never to mandatory `1`, UNLESS the link is necessarily present at row creation (see §4). Asserting `must` / `1..1` participation the source did not state is a fabricated lower bound — forbidden.
+- When you must choose a restrictive value the source did not state (e.g. you believe one decision per booking is intended), do NOT assert it: record it as an **Assumption** AND raise it in Section 13 Open Questions with scope `Database`.
+
+#### 4. Creation-Time Test (the only ground for mandatory participation)
+
+A side may be marked mandatory (`min = 1`) ONLY if the referenced entity necessarily exists at the moment the row is created — i.e. the link is filled on creation, not by a later update.
+
+- VALID mandatory: `Booking Request → Space` (a booking cannot be created without choosing a space); `Usage Session → check-in user` (the session row is created BY the check-in act, so a check-in user always exists).
+- INVALID mandatory (must be optional): any link filled by a LATER action than row creation — e.g. `Usage Session → completion user` (completion happens after the session exists, or never), and `Maintenance Record → assigned staff` IF the source allows "report first, assign later" (the record exists before assignment).
+- If you are unsure whether an after-the-fact link is mandatory, treat it as optional (`0..1`) and raise the timing question as an Open Question (scope `Business Workflow`).
+
+#### 5. Consistency Check Across Same-Pattern Relationships (both dimensions)
+
+Before finalizing Section 5, group relationships that share the pattern "User performs an action that is recorded as a SINGLE actor reference on an event/record entity" (e.g. checks-in, completes, reports, is-assigned, makes-decision). Such an action is performed by **at most ONE user per event occurrence**, because it is recorded by one role column on the event entity (one "checked in by", one "completed by"). Check BOTH dimensions:
+
+- **Maximum (multiplicity) must be identical across the whole group: at most ONE actor per event.** The number of distinct users associated with one event row is `1` for every relationship in the group. A side that says "many users complete one usage session" (a `0..*` / `1..*` actor-per-event maximum) is a **fabricated upper bound** and a defect — a single role column cannot hold many actors. Never justify a many-actor maximum with "the source does not say the actor is stored": if the relationship exists at all, exactly one actor performs each occurrence; if the actor truly is not stored, drop the relationship instead of widening its maximum.
+- **Only participation (minimum) may differ across the group**, and only with a §4 creation-time basis (e.g. check-in is mandatory because it creates the session; completion is optional because it happens later). If two same-pattern relationships differ in their **maximum**, that is always an error. If they differ in **participation**, justify it from §4 or raise it as an Open Question.
+
+Reference defects:
+- `completed_by` was optional but `assigned_to` was mandatory with no source basis for the participation difference (a min defect).
+- `User completes Usage Session` was set to many-completers-per-session (`0..*` on the actor-per-event side) while the sibling `User checks in Usage Session` correctly kept one-actor-per-session — a single-actor action can never have a many maximum, and the asymmetry with its sibling is itself the tell (a max defect).
+
+#### 6. Special Case — Facilities
+
+Unchanged from before: unless the source states a facility item is unique to one space, model Space–Facility as many-to-many (`0..* to 0..*`).
+
+#### 7. Singleton-by-nature test (deciding max = 1 vs max = * when the source is silent)
+
+When the source does not state how many child records a parent may have, §3 defaults the 
+max to `*`. Before accepting `*`, apply this test to decide whether the parent should instead 
+be limited to at most ONE child (`0..1` / `1..1` on the child side):
+
+> "Does the child entity record a SINGLE real-world occurrence that, by its nature, happens 
+> at most once per parent? Or can the parent legitimately accumulate MULTIPLE such records 
+> over time?"
+
+- SINGLETON by nature (max = 1): the child captures one indivisible occurrence of the parent. 
+  Example: a Usage Session records one check-in/completion of one booked use — a booking is 
+  used once, so at most one session. When the singleton test is clearly answered "yes" from the 
+  domain (as it is for Booking Request → Usage Session), you **MUST resolve the cardinality here**: 
+  set the child side to `0..1` and record it as an explicit Assumption stating the real-world 
+  reason (e.g. "one usage session per booking because a session records a single start-to-end 
+  use"). Do NOT set `0..1` silently, and do NOT leave it at `0..*` "because the source did not 
+  give a maximum" — a clearly-singleton relationship resolved by Assumption is the correct, 
+  complete handling, not a deferral. This is a **CLOSED decision**: do NOT also raise the same 
+  one-vs-many multiplicity as an unresolved Open Question that a later stage must re-decide or 
+  escalate. (You may add a stakeholder-confirmation note phrased as "confirm this assumption", 
+  but never as an open multiplicity the logical stage must resolve.) The downstream realization 
+  of a resolved `0..1` is a single unique foreign key — that is the correct implementation of 
+  this decision, not an over-restriction. Reserve the "raise as Open Question" route below ONLY 
+  for relationships where singleton-by-nature genuinely cannot be judged from the domain.
+
+- ACCUMULATING by nature (max = *): the parent can legitimately gather many such records over 
+  time. Example: an Approval Decision — a booking may be rejected then re-decided, so multiple 
+  decisions can accrue. Keep `0..*`.
+
+- GENUINELY UNCERTAIN: if you cannot justify singleton-by-nature from the domain, keep `0..*` 
+  (§3 default) AND raise the one-vs-many question as an Open Question (scope `Database`). Do 
+  NOT push the decision downstream — resolve it here as Assumption or Open Question, never 
+  leave it for the logical stage to invent.
+
+Whichever you choose, you must NOT leave a relationship as `0..*` in the table while ALSO 
+implying elsewhere that only one child exists. The cardinality and the Assumptions/Open 
+Questions must agree.
+
+### Rule 9 - Term Definition
+
+#### 1. Core Requirement
+- Section 1 must define every term that is used in the source text but is not contain in the source text.
+
+#### 2. Specific Terms
+- Layer A and Layer B are the terms that must be defined in Section 2.2. The definitions must be consistent with the source text and the context of the requirement analysis.
 
 
 ## Workflow

@@ -29,15 +29,23 @@ For each check, mark: **PASS**, **FAIL**, or **N/A** (with one-line justificatio
 | B4 | Rejection reason appears only on Approval Decision, not on Booking Request | Check every entity's attribute list by name; confirm rejection reason (or equivalent) appears only in the Approval Decision entity, not in the Booking Request entity |
 | B5 | Terminology consistency check: No two different names are used for the same real-world concept | Scan the entire draft for any case where the same real-world concept is referred to by two different names (e.g., "closed" vs "temporarily closed", "manager", vs "facility manager", "staff" vs "facility staff") |
 | B6 | Every inferred/proposed element is labeled consistently | Scan every attribute, identifier, and derived value. Any element the source does not state as a literal stored fact (proposed surrogate keys, AND derived values such as `decision_outcome` extracted from a conditional like "approved or rejected") carries a visible inference tag and a matching Assumption. FAIL if any inferred element is added without the tag while others carry it. |
+| B7 | No entity splits one source attribute into a named attribute plus a duplicate `type`/`category`/`kind`/`classification` attribute that only carries that attribute's value list | Scan Section 4 for any pair where one attribute names a concept and another holds only its allowed/example values. Booking Request must have exactly one purpose attribute — `purpose of use` — with the lecture/examination/seminar/workshop/meeting/student-activity/administrative-event list attached to it as `Possible purpose of use values`. A `booking type` / `booking category` attribute is fabricated (the source never uses the word "type"/"category" for a booking) and duplicates `purpose of use`. FAIL if both appear, or if the value list is attached to a type/category attribute instead of the source-named attribute. |
 
 
 
 ## C. Relationships and Distinct Actions (Blocking) — corresponds to Workflow step 6
 
+## C. Relationships, Distinct Actions, and Cardinality Grounding (Blocking) — corresponds to Workflow step 6
+
 | # | Check | Pass criteria |
 |---|---|---|
 | C1 | "Checked in by" and "completed by" are modeled as two separate relationships | Check the Usage Session entity and Section 5; confirm both are present as separate relationship entries, not merged into one |
 | C2 | Any other pair of actions that the source allows to be performed by different people at different times are kept separate | Scan Section 5 relationships for any "merged" multi-action rows |
+| C3 | Every relationship in Section 5 has a one-sentence cardinality justification grounded in the source (Rule 8) | Each relationship row includes a justification; confirm it cites or paraphrases a Layer B sentence, not an unstated assumption |
+| C4 | No cardinality asserts an upper-bound restriction (e.g., `0..1`, `1:0..1`, "at most one") that the source does not explicitly state | For every relationship whose cardinality limits a side to at most one, confirm the source explicitly states that limit. An event described in singular present tense ("when a booking is approved or rejected, the system records...") does NOT justify a max-one limit on the decision/event record. If the source is silent on multiplicity, the restrictive cardinality must be either (a) widened to the permissive form (e.g., `1:0..*`), or (b) recorded under Assumptions AND raised in Section 13 as an Open Question with scope `Database`. A restrictive cardinality asserted as fact with neither (a) nor (b) is a FAIL. (Reference defect: `HAS_APPROVAL_DECISION = 1:0..1`.) |
+| C5 | Inferred cardinality restrictions are labeled consistently with other inferred elements (Rule 1.1 §5 parity) | If any proposed/derived element in the document carries an inference tag (e.g., a derived `decision_outcome` or a proposed surrogate key), confirm that any inferred cardinality restriction carries an equivalent tag and Assumptions entry. Asymmetry — one inference flagged while another of the same kind is asserted silently — is a FAIL |
+| C6 | Single-actor relationships allow at most one actor per event, uniformly across the same-pattern group (Rule 8 §5) | For every relationship of the form "a User performs an action recorded as one actor reference on an event/record entity" (checks-in, completes, reports, is-assigned, makes-decision), confirm the number of actors per single event occurrence is at most one. FAIL if any such relationship lets many actors relate to one event (a `0..*`/`1..*` actor-per-event maximum) — a single role column cannot hold many actors, and "the source does not say the actor is stored" is not a valid basis for a many maximum. The whole same-pattern group must share this at-most-one maximum; only participation (whether the actor is mandatory at creation) may differ, and only with a §4 creation-time basis. (Reference defect: `User completes Usage Session` set to many completers per session while sibling `User checks in Usage Session` correctly kept one.) |
+| C7 | Clearly singleton-by-nature relationships are resolved here, not deferred or escalated (Rule 8 §7) | For a parent→child relationship where the child records one indivisible occurrence of the parent (Booking Request → Usage Session), confirm the analysis resolves the child side to `0..1` as an explicit Assumption with a stated real-world reason, and does NOT leave it at `0..*` nor reopen the same one-vs-many multiplicity as an unresolved Open Question the logical stage must re-decide. A resolved singleton is a closed decision (its downstream unique-FK realization is correct, not an over-restriction). FAIL if a clearly-singleton relationship is left permissive or escalated instead of resolved here. |
 
 ## D. Business Rules and Source-Grounding (Blocking) — corresponds to Workflow step 7
 
@@ -100,8 +108,8 @@ Run time: [time]
 Run by: [agent / human reviewer]
 
 A1-A2: [PASS/FAIL each] — [note]
-B1-B6: [PASS/FAIL each] — [note]
-C1-C2: [PASS/FAIL each] — [note]
+B1-B7: [PASS/FAIL each] — [note]
+C1-C7: [PASS/FAIL each] — [note]
 D1-D4: [PASS/FAIL each] — [note]
 E1-E6 (incl. E2a): [PASS/FAIL each] — [note]
 F1-F2: [PASS/FAIL each] — [note]

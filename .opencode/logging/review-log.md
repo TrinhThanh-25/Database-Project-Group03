@@ -96,3 +96,78 @@
 2026-06-26 13:23:00 +07 — Reviewed SQL query design against the current DDL and sample data, including the absence of implemented views and the absence of an approval-decision outcome column.
 2026-06-26 13:23:00 +07 — Confirmed the query set covers all major staff-view topics from BR-25 plus requester-facing availability and management-facing utilization/workload summaries.
 2026-06-26 13:23:00 +07 — Confirmed each query is read-only, uses clear aliases, combines related tables with joins where appropriate, and includes required business-question comments.
+2026-06-29 11:02:37 +07 — Business requirement analysis review: Checked draft against source-grounding, Layer A/B separation, attribute/reference separation, single source of truth for rejection reason, separate check-in/completion actions, min..max cardinalities, scoped Open Questions, and no SQL/design-level leakage. No blocking issues remained after adding the assigned-staff timing Open Question and the closed/temporarily-closed terminology assumption.
+2026-06-29 11:28:43 +07 — Conceptual database design review: Verified all upstream entities and attributes were preserved, relationship-reference facts were modeled as relationships, repeated USER–USAGE_SESSION and USER–MAINTENANCE_RECORD roles were drawn as separate Mermaid lines, count/time conceptual data types were not all strings, business rule coverage includes BR-01 through BR-25, and upstream open questions affecting the model were carried forward individually. No blocking issues remained after correcting §4 cardinality orientation to Entity-A-side first, Entity-B-side second.
+2026-06-29 11:44:54 +07 — gpt-5.5 business-analyst — Reviewed draft against source-layering and grounding rules. Moved usage-policy enforcement, cancelled/no-show transition triggers, maintenance transitions, maintenance reporting/assignment permissions, automatic space-status changes, completion-person storage, atomic approval/status update behavior, and max-one approval/session restrictions to Open Questions where Layer B did not ground them as facts.
+2026-06-29 11:44:54 +07 — gpt-5.5 business-analyst — Post-write review found identical actor responsibilities for requester-only roles. Updated Section 3 to group those roles and recorded the grouping assumption; no blocking failures remain.
+2026-06-29 12:01:33 +07 — gpt-5.5 business-analyst — Reviewed requirement analysis against Layer A/B separation, source-grounded business rules, relationship-reference exclusion from attributes, single source of truth for rejection reason, explicit derived decision outcome tagging, distinct check-in/completion relationships, min..max cardinalities, and scoped Open Questions. No blocking failures remain.
+2026-06-29 12:29:36 +07 — gpt-5.5 conceptual database designer — Reviewed conceptual design against upstream analysis and rubric. Confirmed all seven entities, all attributes, all 11 relationships, repeated relationship pairs, coarse conceptual types, business-rule coverage BR-01 through BR-21, assumptions, and all upstream model-impacting Open Questions are present. No blocking failures remain.
+2026-06-29 12:44:12 +07 — gpt-5.5 logical database designer — Reviewed logical design against source discipline, surrogate INT PK standardization, demoted natural-key UNIQUE constraints, FK/PK type matching, M:N resolution, non-unique `APPROVAL_DECISION.booking_id`, unique `USAGE_SESSION.booking_id` with upstream mismatch flagged, named CHECK constraints, referential actions, BR-01 through BR-21 classification, assumptions, and carried-forward Open Questions. No blocking failures remain.
+2026-06-29 14:03:04 +07 — openai/gpt-5.5 business-analyst — Reviewed the regenerated business requirement analysis against Layer B grounding, actor de-duplication, relationship-reference exclusion from attributes, single source of truth for rejection reason, tagged derived decision outcome, distinct check-in/completion relationships, min..max cardinalities, process completeness, and scoped Open Questions. No blocking failures remain.
+2026-06-29 14:03:04 +07 — openai/gpt-5.5 business-analyst — Post-write review tightened Facility Staff and Facility Manager actor rows to include the generic user booking-submission interaction while preserving their distinct Layer-B responsibilities.
+2026-06-29 14:12:53 +07 — openai/gpt-5.5 conceptual database designer — Reviewed draft against upstream entity and attribute completeness, relationship-reference exclusion from attributes, duplicate fact avoidance, separate repeated relationships, uniform §4 cardinality orientation, Mermaid/§4 relationship-line agreement, conceptual type assignment, BR-01 through BR-22 coverage, and individual Open Question carry-forward. No blocking failures remain before verification commands.
+2026-06-29 14:12:53 +07 — openai/gpt-5.5 conceptual database designer — Verification commands confirmed eleven Mermaid relationship lines match eleven §4 rows and no timestamp/count attributes were typed as string. Final conceptual design self-check has no blocking failures.
+Run date: 2026-06-29
+Run by: gpt-5.5 business analyst agent
+Review comments: Requirement analysis drafted against the fixed template. Layer-A-only manual-process details were not promoted to business rules. Open questions were used for usage policy enforcement, cancelled/no-show transitions, maintenance status lifecycle, maintenance assignment timing, and ambiguous “closed” terminology.
+Additional review note: Staff-viewing permission was treated as ambiguous because Layer B says “Staff” while the enumerated role is “facility staff”; an assumption and Authorization-scope open question were recorded.
+Run date: 2026-06-29
+Run time: 14:49:12 +07
+Run by: gpt-5.5 conceptual database designer agent
+Review comments: Conceptual design drafted against the fixed template. Review confirmed all upstream entities appear, each has exactly one identifier, no foreign-key-style relationship references are copied as attributes, rejection reason remains only on Approval Decision, Mermaid relationship lines match §4 relationship rows, and count/time attributes use non-string conceptual types. Open questions from the requirement analysis that affect modelling were carried forward individually.
+Run date: 2026-06-29
+Run time: 14:59:05 +07
+Run by: gpt-5.5 logical database designer agent
+Review comments: Logical design reviewed for entity/table coverage, attribute traceability, no `facility_description`, no duplicate rejection reason on Booking Request, non-unique `APPROVAL_DECISION.booking_request_id`, unique `USAGE_SESSION.booking_request_id`, role-specific actor FKs, explicit FK actions, named PK/FK/UQ/CK constraints, enum closed/open handling, start/end ordering checks, and business-rule classification. One upstream conceptual issue was escalated: `HAS_USAGE_SESSION` cardinality conflicts with the logical-stage guardrail.
+Run date: 2026-06-29
+Run time: 15:06:40 +07
+Run by: gpt-5.5 database design reviewer agent
+Review comments: Validation report completed without modifying upstream design files. Findings: requirement analysis is strong; conceptual design is complete but leaves `HAS_USAGE_SESSION` open; logical design is mostly implementation-ready with surrogate INT PKs, named constraints, type-matched FKs, explicit referential actions, and in-row CHECKs. Main condition: resolve `HAS_USAGE_SESSION` cardinality before DDL implementation. Final decision: ACCEPTED WITH CONDITIONS.
+---
+Review date: 2026-06-29
+Reviewed by: gpt-5.5 business-analyst agent
+Artifact reviewed: `outputs/01-business-req-analysis-G03.md`
+Review comments:
+- Removed maintenance Reporter from the actor table because it is not one of Layer B's enumerated user roles; retained reporter as a relationship participant for Maintenance Record.
+- Confirmed rejection reason is only on Approval Decision.
+- Confirmed cancelled/no-show appear only as allowed statuses and open workflow questions, not as asserted transitions.
+- Confirmed usage policy enforcement is left as an open Business Workflow question.
+- Confirmed proposed identifiers, derived decision outcome, and singleton usage-session cardinality are tagged and listed under Assumptions.
+---
+Review date: 2026-06-29
+Reviewed by: gpt-5.5 business-analyst agent
+Artifact reviewed: `outputs/01-business-req-analysis-G03.md`
+Review comments:
+- Corrected an analysis mistake where the Layer B sentence “A booking may be for a lecture, examination, seminar, workshop, meeting, student activity, or administrative event” had been modeled as a separate `booking category` attribute.
+- The corrected interpretation keeps `purpose of use` as the single Booking Request attribute and lists those values as possible purpose-of-use values.
+- Cause: generated analysis output over-split one source fact into two attributes; the analyze-step agent/template/rubric did not require or introduce `booking category`.
+## Business Requirement Analysis Review — 2026-06-29 16:16:02 +07
+
+- Reviewed the draft for Layer B grounding and removed/avoided business rules based only on Layer A narrative.
+- Checked actor duplication and grouped requester-only roles to avoid identical responsibility rows while preserving Layer B roles.
+- Checked Section 4 for relationship-reference attributes; requester, selected space, decision maker, check-in person, completion person, reporter, assigned staff, and related space are represented as relationships instead of attributes.
+- Checked the Booking Request purpose/value-list defect: no booking type/category attribute is present; purpose values remain attached to purpose of use.
+- Confirmed Cancelled and No-show are listed as status values but not asserted as transitions.
+## Conceptual Database Design Review — 2026-06-29 16:23:19 +07
+
+- Reviewed entity attributes against upstream §4 and removed no upstream attributes; relationship references remain relationships only.
+- Reviewed repeated entity-pair relationships and kept all distinct roles as separate §4 rows and separate Mermaid lines.
+- Reviewed Mermaid types so counts use `int`, time attributes use `datetime`, and textual/status/code/note attributes use `string`.
+- Reviewed business rule coverage for all BR-1 through BR-21 and added deferred-enforcement/open-question treatment for overlap prevention, unavailable-space booking prevention, and conditional rejection reason enforcement.
+- Reviewed upstream open questions and carried each model-impacting ambiguity into §8 with design impact notes.
+## Logical Database Design Review — 2026-06-29 16:40:15 +07
+
+- Reviewed source filename discipline: Step 2 input path matched `AGENTS.md`, with no discrepancy.
+- Reviewed table coverage: conceptual User, Space, Facility, Booking Request, Approval Decision, Usage Session, and Maintenance Record are mapped; Space-Facility M:N is resolved.
+- Reviewed key strategy: every table uses a surrogate `INT IDENTITY` PK; `USER_ACCOUNT.user_id` and `SPACE.unique_space_code` are unique demoted natural identifiers; FKs do not target natural keys.
+- Reviewed cardinality preservation: `APPROVAL_DECISION.booking_id` remains non-unique for `0..*`; `USAGE_SESSION.booking_id` is unique for `0..1`; role-playing relationships use distinct columns.
+- Reviewed constraint evidence: CHECK constraints are applied to closed value sets with available upstream values; open catalogs and missing value lists are documented instead of constrained.
+- Reviewed implementation rules/open questions: cross-row overlap, cross-table availability, role restrictions, maintenance synchronization, and participant-count versus capacity are not overclaimed as ordinary constraints.
+## Database Design Validation Review — 2026-06-29 16:45:57 +07
+
+- Reviewed requirement analysis against the Facility Manager summary: coverage is complete and no ungrounded Cancelled/No-show transitions are asserted.
+- Reviewed duplicate value-list pattern: Booking Request uses purpose of use only; no fabricated booking type/category was affirmed as a source fact.
+- Reviewed conceptual cardinalities: §4 uses uniform A→B notation; approval decisions remain accumulating; usage session singleton is resolved.
+- Reviewed single-actor relationships across decision-maker, check-in, completion, reporter, and assignment: all have at-most-one actor per event occurrence.
+- Reviewed logical design constraints: surrogate INT PK standardization, demoted natural keys with UNIQUE, INT FK type matching, explicit referential actions, named constraints, in-row time-order checks, and rejected-reason CHECK all pass.
+- Reviewed implementation risks: overlap prevention, unavailable-space booking, role restrictions, maintenance status/synchronization, account status values, and capacity comparison remain conditions or open questions rather than design defects.

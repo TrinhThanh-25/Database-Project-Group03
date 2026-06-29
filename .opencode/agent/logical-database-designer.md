@@ -114,35 +114,50 @@ Every foreign key must declare an explicit `ON DELETE` and `ON UPDATE` action. N
 
 ### Rule 4 - Constraint evidence
 
-- Allowed-value CHECK constraints may be defined only when the upstream documents list the allowed values.
-- When allowed values are not listed, keep the column unconstrained and carry the item as an Open Question.
-- Use SQL Server-compatible data type names because the project default DBMS is Microsoft SQL Server.
+#### Allowed-value CHECK — two independent tests, both required
 
-#### Derivable single-row CHECK constraints (in scope — do not defer)
+Whether to add an allowed-value CHECK depends on TWO questions, answered separately. 
+Do NOT use "did the source list values?" as the sole criterion — the source may list 
+values with the same phrasing ("such as", "may be") for both closed sets and open 
+catalogs, so that question alone cannot distinguish them.
 
-A single-row CHECK is enforceable by an ordinary constraint, with no trigger. These are squarely within logical design and must be defined (not omitted, and not pushed into "implementation rules" with the trigger-level rules):
+**Test A — Are concrete values available to enforce?**
+The upstream documents must provide the actual value strings (a list introduced by 
+"such as", "may be", or an explicit enumeration all qualify). If no values are available 
+at all, no CHECK is possible → leave unconstrained and raise an Open Question.
 
-- Chronological ordering of paired time columns on the same row, whenever the model makes the ordering self-evident: `requested_end_time > requested_start_time`, `actual_end_time > actual_start_time`, `completion_time > start_time`, and any analogous start/end pair.
-- Any other obvious within-row sanity bound the source implies (e.g. non-negative counts) when it does not require values the source has not stated.
+**Test B — Is the value set CLOSED (a fixed control vocabulary) or OPEN (an extensible catalog)?**
+A set is CLOSED when its members are system-control values that govern behaviour, lifecycle, 
+or authorization, and an unlisted value would be meaningless or unsafe to the system — these 
+are stable by nature even if the source said "such as". A set is OPEN when its members are 
+descriptive catalog entries that a real deployment is expected to extend over time, where an 
+unlisted value is plausible and harmless.
 
-Reserve "requires implementation logic" for genuinely cross-row or cross-table rules (overlap prevention, role restrictions, status-driven cross-entity effects). Do not let careful handling of those trigger-level rules become an excuse for skipping the simple in-row CHECKs above. Before delivery, list every start/end (or event-time vs start-time) column pair and confirm each has its ordering CHECK.
+| Field kind | Closed/Open | CHECK? |
+|---|---|---|
+| Lifecycle / state values (`booking_status`, `current_status`) | Closed — drive workflow & integrity | YES |
+| Authorization / role values (`role`) | Closed — govern permission checks | YES |
+| Process-category values the system branches on (`purpose_of_use`) | Closed — fixed business categories | YES |
+| Descriptive type/catalog labels (`space_type`, `facility_name`) | Open — a deployment may add new types/equipment | NO |
 
-#### Constraint naming and in-row conditional CHECKs (no prose-only rules)
+#### Decision and documentation rule
 
-- Every constraint you create — `PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, and `CHECK` — must have an explicit, descriptive name (e.g. `PK_`, `FK_`, `UQ_`, `CK_` prefixes). Do not rely on system-generated names and do not describe a constraint only in prose.
-- If a conditional rule is expressible as a single-row CHECK, it must appear as a **named** CHECK constraint in the table definition, not merely as a sentence in "implementation rules". The canonical case is the rejected-decision rule (BR-14): "if the decision is rejected, a rejection reason must be present" references only columns of the same row, so it must be a named constraint such as `CK_APPROVAL_DECISION_rejection_reason CHECK (decision_outcome <> 'Rejected' OR rejection_reason IS NOT NULL)`. Do not leave it as prose like "could be enforced by a CHECK".
-- A rule may remain prose-only **only** when it genuinely cannot be a single-row constraint (cross-row or cross-table: overlap prevention, role restrictions against `USER_ACCOUNT.role`, completion consistency across rows). In that case classify it explicitly as implementation logic (Rule 5), do not pretend a named constraint exists.
-- Before delivery, scan every conditional rule you wrote in prose and confirm each is either (a) a named in-row constraint, or (b) explicitly justified as cross-row/cross-table implementation logic.
+- Add a named allowed-value CHECK only when BOTH Test A passes AND Test B = Closed.
+- When Test A passes but Test B = Open, leave the column unconstrained **and state the 
+  reason explicitly as a domain judgment**, e.g.: "No CHECK on `space_type`: although the 
+  source lists example types, this is an open descriptive catalog expected to grow; 
+  enforcing a fixed list would reject valid future types." Do NOT justify the omission by 
+  claiming the source "did not list values" when it did — that misstates the evidence.
+- When Test A fails (no values available), leave unconstrained and carry as an Open Question.
+- The closed/open classification for every enumerated column must be stated once, so a 
+  reviewer can see the SAME rule was applied to every such column and can challenge the 
+  judgment directly rather than discovering an unexplained asymmetry.
 
-#### Nullability must not exceed source-stated strength
+#### Prohibition — no asymmetry without stated basis
 
-Apply the global *Constraint-strength evidence* rule from `AGENTS.md` to nullability. A value the source says is "recorded" or "stored" (e.g. a decision note, usage notes) is not thereby mandatory — default such columns to nullable unless the source states they are required. Mark NOT NULL only where mandatory-ness is stated or clearly implied (identifiers, foreign keys for mandatory relationships, lifecycle values that always exist at row creation). Keep sibling fields of the same kind consistent: do not make `decision_note` NOT NULL while correctly leaving `usage_notes` nullable when the source treats both as optional notes.
-
-#### Candidate keys vs invented uniqueness
-
-- Identify candidate keys — natural attributes that uniquely identify a row — and apply a UNIQUE constraint to each, recording the reasoning as an assumption. A university-account email is a per-account natural identifier (every user has one university account, and an institutional email maps to exactly one account); model `email` with a UNIQUE constraint and record it as an assumption.
-- Every natural/business key that was demoted from primary key under "Primary key standardization" (e.g. `user_id` student code, `unique_space_code`) is itself a candidate key and must carry its own named `UNIQUE` constraint. These are not optional: the surrogate `INT` PK guarantees row identity, but the demoted natural key must still be prevented from duplicating.
-- Beyond genuine candidate keys, do not invent uniqueness (e.g. unique facility name, unique space name, unique room location) unless the upstream documents state or clearly imply it.
+It is a defect to add a CHECK to one "such as" list and omit it from another "such as" list 
+without recording WHY they differ. The difference must be the closed/open judgment above, 
+named explicitly — never left implicit or rationalized by a false "not listed" claim.
 
 ### Rule 5 - Business rule enforcement classification
 
@@ -189,3 +204,7 @@ Before writing `outputs/03-logical-design-G03.md`, verify:
 - every listed enum comes from upstream values;
 - every unsupported or non-enforceable rule is recorded under implementation rules or Open Questions;
 - no output file other than `outputs/03-logical-design-G03.md` is changed by this stage.
+- every enumerated column is classified closed/open with a stated basis; a CHECK exists 
+  iff the set is closed AND values are available; any two "such as" lists treated 
+  differently have their closed/open difference named explicitly (no unexplained asymmetry, 
+  no "not listed" excuse when the source did list examples);

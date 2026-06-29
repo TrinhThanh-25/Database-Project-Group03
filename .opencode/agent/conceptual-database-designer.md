@@ -48,16 +48,79 @@ Every entity in the conceptual ERD must have exactly one identifier attribute (c
 
 ---
 
-### Rule 2 — Distinct role-players must be distinguishable
+### Rule 2 — Participation must be determined for every relationship (no exceptions)
 
 #### 1. Core Principle
 
-Where two references on the same entity may point to different people, the model must keep them separate (two distinct relationships).
+For EVERY relationship in §4 — not only the ones named as examples anywhere in this 
+document — you must independently determine, for BOTH sides, two things:
+- **Multiplicity**: does this side link to one (`1`) or many (`*`)?
+- **Participation**: is this side mandatory (`min = 1`) or optional (`min = 0`)?
 
-#### 2. Required Cases
+Write every relationship's cardinality in per-side min..max form (`0..1`, `1..1`, `0..*`, 
+`1..*`). A relationship whose participation has not been explicitly decided for both sides 
+is incomplete and blocks delivery. Never leave participation to be inferred from the prose 
+or copied blindly from upstream.
 
-- **USAGE_SESSION**: "checked in by" and "completed by" are two separate roles that can be different users. Model them as two distinct relationships (e.g. `CHECKED_IN_BY`, `COMPLETED_BY`), each User (1) — (0..*) Usage Session. A single generic "handled by" relationship is **not** acceptable.
-- **MAINTENANCE_RECORD**: "reporter" and "assigned staff member" are two separate roles; model them separately.
+#### 2. The Creation-Time Test — the single general rule for mandatory vs optional
+
+A side is mandatory (`min = 1`) IF AND ONLY IF the linked entity necessarily exists at the 
+moment the row is created — i.e. the reference is filled at creation, not by a later update.
+Apply this test to every relationship side; it replaces all per-case rules about which roles 
+are optional.
+
+| The reference is filled... | Participation on that side |
+|---|---|
+| At row creation (cannot create the row without it) | mandatory `1` |
+| By a later action than creation, OR may never happen | optional `0..1` |
+| Source does not state the timing | optional `0..1` + raise an Open Question (scope `Business Workflow`) |
+
+#### 3. Procedure (run for all relationships, in a loop)
+
+For each relationship A–B, ask four questions and record each answer with its basis:
+1. One A → many or one B? (B-side max)
+2. One B → many or one A? (A-side max)
+3. Apply the Creation-Time Test to the A-side. (A-side min)
+4. Apply the Creation-Time Test to the B-side. (B-side min)
+
+No question may be skipped because "the document didn't give an example for this relationship."
+
+#### 4. Do not invent restrictions the source omits
+
+- Source silent on a max → default to `*`, never `1`. A fabricated `0..1`/`1..1` upper bound 
+  is forbidden (record as Assumption + Open Question if you believe the limit is intended).
+- Source silent on a min, and the Creation-Time Test does not force `1` → default to `0` 
+  (optional). A fabricated mandatory participation is forbidden.
+
+#### 5. Same-pattern consistency (both dimensions)
+
+After completing §4, group relationships sharing the shape "a User performs an action recorded 
+as a SINGLE actor reference on an event/record entity" (check-in, completion, reporting, 
+assignment, decision-making, …). Such an action is performed by AT MOST ONE user per event 
+occurrence — it is realized by one role FK column on the event entity. Confirm BOTH dimensions:
+
+- The actor-per-event MAXIMUM is `1` for every relationship in the group — never `*`. The §4 
+  "source silent on a max → default `*`" rule does NOT apply to this side: a single role column 
+  structurally cannot reference many actors, so a many-actors-per-event reading is a fabricated 
+  upper bound, not a permissive default. (This is the COMPLETED_BY / CHECKED_IN_BY actor side.) 
+  If two same-shape relationships differ in their maximum, that is always an error — fix it.
+- Only participation (the minimum) may differ within the group, and only via the Creation-Time 
+  Test: check-in is mandatory on the session side (the session is created by check-in), 
+  completion is optional (it happens later or never). If two same-shape relationships differ in 
+  participation, cite the source difference or raise it as an Open Question.
+
+Differences must be justified, never accidental. (Reference defect: COMPLETED_BY set to many 
+completers per session while CHECKED_IN_BY kept one — a single-actor action can never have a 
+many maximum, and the asymmetry with its sibling is the tell.)
+
+#### 6. Illustrations (non-normative — examples only, NOT the source of the rule)
+
+These merely show §2 applied; they do not limit the rule to these cases:
+- CHECKED_IN_BY → session-side mandatory (session is created by the check-in act).
+- COMPLETED_BY → session-side optional (completion occurs after the session exists, or never).
+- REPORTED_BY → record-side mandatory (record is created by the report).
+- ASSIGNED_TO → record-side optional unless the source states assignment occurs at creation.
+- SELECTS_SPACE → mandatory (a booking cannot be created without choosing a space).
 
 ---
 
@@ -107,6 +170,22 @@ This rule takes precedence over Rule 1 when a conflict arises. Rule 1 says "do n
 
 ---
 
+### Rule 3.2 — Value-list over-splitting detection (within an entity)
+
+#### 1. Core Principle
+
+Even if the upstream analysis carried it, do not keep two attributes on the same entity where one names a concept and the other only holds that concept's allowed/example values. The "Invented Attribute Detection" of Rule 3 §2 will not catch this on its own, because a value-list-duplicate attribute that came from upstream *is* present upstream — it must be removed on the duplication test, not the traceability test.
+
+#### 2. Scan Procedure
+
+Before finalising each entity, scan for a `type` / `category` / `kind` / `classification` attribute that merely restates the value list of another attribute already present on the same entity. If found, remove the type/category attribute, keep the value set on the originally named attribute, and record the removal as an Assumption per Rule 3.1 §2's format, noting it as an upstream analysis error.
+
+#### 3. Concrete Example
+
+`BOOKING_REQUEST` must carry exactly one purpose attribute — `purpose_of_use` — with the lecture / examination / seminar / workshop / meeting / student-activity / administrative-event set documented as its values. A `booking_type` / `booking_category` attribute is a fabricated duplicate (the source never names a booking "type"/"category"); remove it and keep the value set on `purpose_of_use`.
+
+---
+
 ### Rule 4 — Traceability
 
 #### 1. Core Principle
@@ -134,6 +213,26 @@ A participation description that only explains one direction is incomplete.
 
 In §4 the `Cardinality` column must always be written in the same order as the `Entity A` and `Entity B` columns of that row: Entity-A-side symbol first, then Entity-B-side symbol (e.g. `1 to 0..*` means A=1, B=0..*). Every row must follow this orientation. Do not flip the order on individual rows (e.g. writing `0..* to 0..1` for a `COMPLETED_BY` row whose Entity A is `User`, while every other `User`-anchored row reads `1 to 0..*`). A flipped row is still readable from its prose but breaks table-wide consistency and invites misreading — it is a defect even when the prose is correct. Before delivery, scan the column and confirm a single, consistent A→B orientation across all rows.
 
+#### 5. Upstream cardinality is not automatically trusted
+
+Rule 4 §2 requires matching upstream cardinality, but matching does NOT mean copying a 
+fabricated restriction. Before adopting any upstream cardinality that restricts a side to 
+`0..1` / `1..1` (an upper bound) or marks a side mandatory (`must`), re-apply the source test: 
+does the ORIGINAL requirement text state that limit? 
+- If yes → adopt and cite it.
+- If the limit was inferred by upstream with no source basis → do NOT copy it as fact. 
+  Model the permissive form (`0..*`), and record both the upstream value and your correction 
+  in §7 Assumptions, and raise it in §8 Open Questions. 
+This is the conceptual stage's duty to validate, not merely transcribe, the upstream model.
+
+Exception — singleton-by-nature resolutions are legitimate; keep them. A `0..1` child side that 
+upstream resolved as a singleton-by-nature decision backed by an explicit Assumption (e.g. 
+Booking Request → Usage Session: one session per booking, because a session records a single 
+start-to-end use) is NOT a fabricated restriction. Adopt it as modelled, carry its Assumption 
+forward, and do NOT widen it back to `0..*` — that would re-open a decision the analysis already 
+closed and re-create the downstream escalation it was meant to prevent. Its correct logical 
+realization is a single unique foreign key. Only widen an upper bound that upstream asserted 
+with NO stated source or Assumption basis.
 ---
 
 ### Rule 5 — Ambiguity handling
@@ -195,6 +294,43 @@ If the diagram symbol and the §4 participation text disagree, the diagram is in
 #### 5. Final Check
 
 Before delivery, count the relationship lines in the diagram and confirm the total equals the number of rows in §4. Any mismatch means a relationship was silently merged or dropped, and must be fixed.
+
+### Rule 8 — Data type not always string
+
+#### 1. Core Principle
+
+Each attribute in the Mermaid ERD must be declared with a conceptual data type that reflects the real-world nature of the value. Declaring every attribute as `string` is a defect: it discards information that is already evident from the upstream analysis (a capacity is a count, a start time is a point in time) and signals a mechanical copy rather than deliberate modelling. The conceptual type need not be DBMS-specific or carry precision/length — that refinement is a logical-stage decision (Rule 6 Stage Boundary) — but it must distinguish, at minimum, text from numbers, dates/times, and booleans.
+
+#### 2. Type Assignment Guidance
+
+Assign the conceptual type from the meaning of the attribute in the upstream analysis, not from its surface label:
+
+| Attribute kind | Conceptual type | Examples in this domain |
+|---|---|---|
+| Free text / names / codes / notes | `string` | full_name, email, unique_space_code, space_name, problem_description, usage_notes, decision_note, result_note, usage_policy |
+| Whole-number counts | `int` | capacity, expected_number_of_participants |
+| Points in time | `datetime` | requested_start_time, requested_end_time, decision_time, actual_start_time, actual_end_time, start_time, completion_time |
+| Enumerated status / category text | `string` | role, current_status, space_type, purpose_of_use, booking_status, decision_outcome, maintenance status |
+| True/false facts | `boolean` | (only if the source names one) |
+
+Notes:
+- Enumerated/status fields stay `string` at the conceptual level (the allowed-value set is documented in the analysis, not encoded as a type here). Do **not** invent an enum type the upstream analysis did not name.
+- An identifier's type follows its nature: a natural code identifier (e.g. `unique_space_code`, `user_id`) is `string`; do **not** retype it to `int` to anticipate a surrogate key — that is a logical-stage decision (Rule 1 Stage Boundary note).
+
+#### 3. Mandatory Check Before Finalizing the ERD
+
+After writing the Mermaid block, scan every attribute line and ask:
+> *"Is this value actually free text, or did I label a count / a timestamp as `string` out of habit?"*
+
+Specifically confirm that **no** count attribute and **no** time attribute is declared `string`. If a `capacity`, a participant count, or any `*_time` / `*_date` attribute is typed `string`, it is a FAIL — correct it before delivery.
+
+#### 4. Prohibited Justification
+
+Do not justify a blanket `string` typing by claiming "types don't matter at the conceptual level." Types are indicative (not binding) at this stage, but indicative typing is still required: the conceptual model must communicate the nature of each value so the logical stage can map precision and length without re-deriving intent from the analysis. "All `string`" is never an acceptable conceptual type assignment.
+
+#### 5. Stage Boundary
+
+Conceptual types are coarse and indicative only. Do **not** specify SQL Server types, lengths, precision, or nullability here (e.g. `NVARCHAR(200)`, `DATETIME2(0)`, `INT IDENTITY`) — those belong to the logical/physical designer. The obligation at this stage is limited to the coarse distinction in §2 (text vs number vs datetime vs boolean).
 
 ## Workflow
 1. Read the business requirements analysis document and understand the entities, attributes, relationships, cardinalities, and participation constraints.

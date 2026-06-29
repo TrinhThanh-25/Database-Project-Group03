@@ -1,198 +1,193 @@
 # Database Design Validation Report - G03
 
-## 1. Metadata
+## 1. Introduction
 
-| Item | Value |
-|------|------|
-| Review Date | 2026-06-26 |
-| Reviewer | openai/gpt-5.5 database-design-reviewer agent |
-| Target System | Campus Space Management System |
-| Required DBMS Context | Microsoft SQL Server |
+Review date: 2026-06-29 16:45:57 +07  
+Reviewer: openai/gpt-5.5 database-design-reviewer  
+Final output: `outputs/04-design-validation-G03.md`
+
+### Review Objective
+
+Provide an objective validation of the submitted database design by comparing the requirement analysis, conceptual database design, and logical database design against the original business requirements. This review does not modify the submitted designs.
 
 ### Inputs Reviewed
 
 Reviewed in the required order:
 
-1. `req/business-requirement.md`
-2. `outputs/01-business-req-analysis-G03.md`
-3. `outputs/02-erd-design-G03.md`
-4. `outputs/03-logical-design-G03.md`
-
-### Review Objective
-
-Provide an objective validation of the submitted database design by comparing the requirement analysis, conceptual database design, and logical database design against the original Facility Manager requirements. This review identifies alignment, gaps, risks, and recommendations only; it does not modify the submitted design.
+1. Business Requirements: `req/business-requirement.md`
+2. Requirement Analysis: `outputs/01-business-req-analysis-G03.md`
+3. Conceptual Design: `outputs/02-erd-design-G03.md`
+4. Logical Design: `outputs/03-logical-design-G03.md`
 
 ---
 
-# 2. Summary of Findings
+## 2. Summary of Findings
 
 | Reviewed Artifact | Grade | Summary |
 |------|------|------|
-| Business Requirement Analysis | A- | Accurately captures the Facility Manager summary, identifies actors/entities/attributes/relationships/rules, and correctly treats `Cancelled`/`No-show` triggers as scoped Open Questions rather than asserted transitions. |
-| Conceptual Database Design | B+ | Covers all core entities, attributes, and relationships, with complete participation text and uniform A→B cardinality notation. Main weakness is the over-restrictive `HAS_APPROVAL_DECISION` cardinality (`1 to 0..1`) despite no explicit stakeholder rule limiting a booking to one decision. |
-| Logical Database Design | A- | Strong logical mapping with surrogate `INT` PK standardization, type-matched FKs, named constraints, in-row CHECK constraints, explicit referential actions, and good implementation-risk classification. The main condition is to resolve/confirm approval-decision history cardinality and implement cross-row/cross-table business rules in DDL. |
+| Business Requirement Analysis | A- | Accurately captures the Facility Manager summary, entities, attributes, workflows, assumptions, and scoped open questions. It correctly avoids inventing booking type/category and correctly treats Cancelled/No-show transition triggers as open workflow questions. |
+| Conceptual Database Design | A- | Represents all major entities, attributes, and relationships. Cardinality notation is uniform in §4, single-actor relationships are at-most-one actor per event, and Booking Request → Usage Session is correctly resolved as a singleton `0..1`. |
+| Logical Database Design | A- | Strong logical transformation with surrogate `INT` PKs, demoted natural keys, named constraints, FK actions, in-row CHECKs, and correct non-unique approval-decision history. Remaining risks are implementation conditions for cross-row/cross-table and authorization rules. |
 
 ### Overall Assessment
 
-The submitted design is structurally sound and substantially satisfies the business requirements. It should proceed to implementation **with conditions**: implementation must enforce cross-row/cross-table rules such as approved-booking overlap prevention, unavailable-space booking prevention, and role restrictions; stakeholders should confirm the approval-decision history cardinality because the conceptual design is stricter than the logical design and stricter than the validation guardrail permits without explicit evidence.
+The submitted design is consistent and implementation-ready with conditions. Core entities and relationships are covered, and the logical schema handles key constraints, FK type matching, referential actions, and single-row CHECK constraints well. The main remaining work is implementation of rules that ordinary relational constraints cannot enforce, especially overlapping approved bookings, unavailable-space booking prevention, and role-based action restrictions.
 
 ---
 
-# 3. Requirement Analysis Review
+## 3. Requirement Analysis Review
 
 | Requirement Area | Review Result | Evidence |
 |------|------|------|
-| User Management | Complete | The Facility Manager summary requires user ID, full name, email, phone, role, department, and account status; analysis §4.1 and BR-01–BR-03 capture these. |
-| Space Management | Complete | The source requires unique space code, name, type, building, floor, room, capacity, status, and usage policy; analysis §4.2 and BR-04–BR-06 capture these. |
-| Facility Management | Complete | The source says each space may have several facilities and stores the list; analysis §4.3, relationship “Space has Facility,” and BR-07 capture this. |
-| Booking Management | Complete | The source requires booking request space, requested times, purpose, expected participants, status, conflict prevention, and unavailable-space prevention; analysis §4.4 and BR-08–BR-13 capture these. |
-| Approval Management | Complete | The source says approval may be required and decisions record staff member, time, note, and rejection reason when rejected; analysis §4.5 and BR-14–BR-16 capture these, including tagged derived `decision_outcome`. |
-| Usage Session Management | Complete | The source requires check-in and completion facts; analysis §4.6, §5, and BR-17–BR-19 capture them and keep check-in/completion actors separate. |
-| Maintenance Management | Complete with scoped ambiguities | The source requires related space, reporter, assigned staff, problem description, start/completion time, status, and result note; analysis §4.7 and BR-20–BR-23 capture them while leaving status lifecycle and role scope open. |
-| Historical Data Management | Complete | The source says historical booking and maintenance records should be kept and staff can view histories/upcoming/maintenance/no-show records; analysis BR-24–BR-25 captures this and scopes authorization ambiguity. |
+| User Management | Covered | Source says each user has a university account and stores user ID, full name, email, phone, role, department, and account status. Analysis BR-1/BR-2 and User entity cover these facts. |
+| Space Management | Covered | Source says spaces store unique space code, name, type, building, floor, room, capacity, current status, and usage policy. Analysis Space entity and BR-3/BR-4 cover these. |
+| Facility Management | Covered | Source says each space may have several facilities and stores the list. Analysis Facility entity and Space–Facility relationship cover this. |
+| Booking Management | Covered | Source says users submit booking requests by selecting a space, requested times, purpose of use, and expected participants. Analysis Booking Request entity and BR-6/BR-7/BR-8 cover this without adding a fabricated booking type/category. |
+| Approval Management | Covered | Source approval paragraph says approval may be by facility staff/manager and records staff member, time, note, and rejection reason if rejected. Analysis Approval Decision entity and BR-11 to BR-13 cover this. |
+| Usage Session Management | Covered | Source says facility staff check in and complete bookings, recording actual times, conditions, and notes. Analysis Usage Session entity and BR-14 to BR-16 cover this. |
+| Maintenance Management | Covered | Source says spaces may have maintenance records storing related space, reporter, assigned staff, problem, times, status, and result note. Analysis Maintenance Record entity and BR-17 to BR-19 cover this. |
+| Historical Data Management | Covered | Source says the system should keep historical booking and maintenance records. Analysis BR-20 and traceability matrix cover this. |
 
 ### Issues
 
-No blocking issue was found in the requirement analysis. The analysis correctly avoided raw line-number citations and treated `Cancelled`/`No-show` transition triggers as scoped Business Workflow Open Questions, which is the expected handling under the reviewer instructions.
+No requirement-analysis defect requiring redesign was found. The following important checks were performed and passed:
+
+- Duplicate value-list scan: `Booking Request` carries `Purpose of use` only; there is no fabricated booking type/category attribute.
+- Cancelled/No-show classification: analysis lists them as status values but does not assert ungrounded transitions; missing trigger/role is scoped under Open Questions.
+- Inference labeling: proposed identifiers and derived `decision_outcome` are visibly labeled and recorded in assumptions.
 
 ---
 
-# 4. Conceptual Database Design Review
+## 4. Conceptual Database Design Review
 
-## Strengths
+### Strengths
 
-- Models all seven upstream entities: User, Space, Facility, Booking Request, Approval Decision, Usage Session, and Maintenance Record.
-- Represents relationship-reference facts as relationships rather than attributes, including selected space, decision maker, check-in actor, completion actor, maintenance reporter, and assigned staff.
-- Keeps distinct role-playing relationships separate: `CHECKED_IN_BY` vs `COMPLETED_BY`, and `REPORTED_BY` vs `ASSIGNED_TO`.
-- Uses uniform Entity-A→Entity-B cardinality notation in conceptual §4.
-- Carries forward upstream assumptions and Open Questions individually.
+- All seven analysis entities are represented: User, Space, Facility, Booking Request, Approval Decision, Usage Session, and Maintenance Record.
+- Attribute coverage is complete and uses appropriate conceptual types (`int` for counts, `datetime` for time values, `string` for text/status/code values).
+- The §4 relationship table uses uniform Entity-A → Entity-B cardinality orientation.
+- Single-actor relationships were swept: `MADE_BY`, `CHECKED_IN_BY`, `COMPLETED_BY`, `REPORTED_BY`, and `ASSIGNED_TO` all allow at most one actor per event occurrence; only participation differs where creation timing differs.
+- Booking Request → Usage Session is correctly treated as a resolved singleton (`1..1 to 0..1`) and is not left as an unresolved multiplicity.
+- Booking Request → Approval Decision remains accumulating (`1..1 to 0..*`), preserving decision history.
 
-## Issues
+### Issues
 
 | ID | Severity | Finding | Evidence | Recommendation |
 |------|------|------|------|------|
-| C-01 | Medium | `HAS_APPROVAL_DECISION` is over-restricted in the conceptual design as `Booking Request 1 to Approval Decision 0..1`. The source does not explicitly state “at most one decision per booking,” and the reviewer guardrail requires approval-decision history to remain possible unless stakeholders justify one-decision-per-booking. | Requirement evidence: the Facility Manager approval paragraph says “When a booking is approved or rejected, the system records the staff member who made the decision, the decision time, and a decision note,” but does not state only one decision may exist. Conceptual §4 row `HAS_APPROVAL_DECISION` says each Booking Request may have zero or one Approval Decision. Logical §1 records this as a design-stage discrepancy and keeps `APPROVAL_DECISION.booking_id` non-unique. | Before implementation, confirm whether full approval/audit history is required. If no explicit one-decision requirement exists, revise the conceptual cardinality in a future design iteration to allow `Booking Request 1 to Approval Decision 0..*` and keep the logical non-unique FK. |
+| C-01 | Low | Conceptual design appropriately defers several rules to logical/implementation stages; this is not a defect but must remain visible. | Conceptual §5 marks BR-9, BR-10, BR-13, and BR-19 as deferred or partly deferred; §8 carries open questions. | Keep these deferred rules traceable into DDL/implementation tasks and test cases. |
 
 ---
 
-# 5. Logical Database Design Review
+## 5. Logical Database Design Review
 
-## Strengths
+### Strengths
 
-- Every conceptual entity maps to a logical table: `USER_ACCOUNT`, `SPACE`, `FACILITY`, `BOOKING_REQUEST`, `APPROVAL_DECISION`, `USAGE_SESSION`, and `MAINTENANCE_RECORD`.
-- The M:N `SPACE`–`FACILITY` relationship is resolved by `SPACE_FACILITY` with FKs to both parents and a uniqueness constraint on the pair.
-- Every table has a named surrogate `INT IDENTITY` primary key; natural keys `user_id` and `unique_space_code` are demoted and protected with named UNIQUE constraints.
-- Every FK column is `INT` and references a surrogate `INT` PK; no FK targets a demoted natural key.
-- Candidate keys are handled: `UQ_USER_ACCOUNT_user_id`, `UQ_USER_ACCOUNT_email`, and `UQ_SPACE_unique_space_code` are present.
-- In-row CHECK constraints are present for requested booking time order, usage-session time order, maintenance time order, participant non-negativity, and rejected-decision rejection reason.
-- Every listed PK/FK/UQ/CK constraint is explicitly named.
-- Every FK declares explicit `ON DELETE` and `ON UPDATE` actions with consistent reasoning: `SPACE_FACILITY` cascades, historical/master references use `NO ACTION`, and all updates use `NO ACTION` due to immutable surrogate keys.
-- `APPROVAL_DECISION.booking_id` is intentionally non-unique, avoiding an unjustified one-decision-per-booking restriction at the logical level.
+- Every table has a named surrogate `INT IDENTITY` primary key (`PK_...`).
+- Natural keys are preserved correctly: `USER_ACCOUNT.user_id` has `UQ_USER_ACCOUNT_user_id`, `SPACE.unique_space_code` has `UQ_SPACE_unique_space_code`, and email has `UQ_USER_ACCOUNT_email`.
+- Every FK column is `INT` and references a surrogate `INT` PK, not a demoted natural key.
+- Every FK declares explicit `ON DELETE` and `ON UPDATE` actions with consistent reasoning: `SPACE_FACILITY` uses delete cascade; historical/master references use `NO ACTION`; all updates use `NO ACTION` because surrogate PKs are immutable.
+- All PK, FK, UNIQUE, and CHECK constraints are named.
+- In-row temporal CHECKs are present: `CK_BOOKING_REQUEST_requested_time_order`, `CK_USAGE_SESSION_actual_time_order`, and `CK_MAINTENANCE_RECORD_time_order`.
+- The rejected-decision rule is enforced as named in-row CHECK `CK_APPROVAL_DECISION_rejection_reason`.
+- `APPROVAL_DECISION.booking_id` is explicitly non-unique, matching conceptual `HAS_APPROVAL_DECISION` `1..1 to 0..*`; `USAGE_SESSION.booking_id` is unique, correctly realizing the resolved singleton session relationship.
 
-## Issues
+### Issues
 
 | ID | Severity | Finding | Evidence | Recommendation |
 |------|------|------|------|------|
-| L-01 | Medium | The logical design intentionally diverges from conceptual `HAS_APPROVAL_DECISION` cardinality to preserve audit history. This is the right implementation-safe direction, but the discrepancy must be resolved for documentation consistency. | Conceptual §4 states `HAS_APPROVAL_DECISION` as `1 to 0..1`; logical §1 records this discrepancy and §2.6 states `APPROVAL_DECISION.booking_id` is “plain non-unique” and intentionally not unique. | Treat this as a condition before DDL finalization: either update the conceptual design in a later iteration to match decision-history preservation, or obtain explicit stakeholder confirmation that only one decision per booking is permitted and then add a named unique constraint. |
-| L-02 | Medium | Several core business rules are not enforceable by ordinary relational constraints and must be implemented in the DDL/application transaction layer. | Requirement evidence: BR-11/BR-12 require preventing conflicting and overlapping approved bookings; BR-13/BR-23 require preventing booking unavailable spaces; BR-15/BR-17/BR-19 constrain staff roles. Logical §4 classifies these as SQL Server implementation logic. | Implement and test triggers, stored procedures, or transaction-safe service logic for overlap prevention, unavailable-space booking prevention, approval-maker role checks, and check-in/completion role checks. |
-| L-03 | Low | Some allowed-value and workflow constraints remain intentionally open because the source does not define the values or triggers. This is not a defect, but it is a clarification dependency. | Analysis §13 and logical §6 carry Open Questions for user account status values, maintenance status values/transitions, cancellation/no-show triggers, capacity comparison, and staff-view authorization scope. | Keep these as stakeholder clarification items. Do not add CHECK constraints or transition rules until requirements are confirmed. |
+| L-01 | High | Approved-booking overlap prevention requires implementation logic and must not be missed during DDL/application implementation. | Source says “The same space cannot have two approved bookings with overlapping time periods.” Logical §2.5 and §4 classify BR-9 as trigger/procedure/transaction logic. | Implement and test a SQL Server trigger, stored procedure, or serializable transaction rule that rejects overlapping approved bookings for the same `space_id`. |
+| L-02 | High | Booking unavailable spaces requires cross-table implementation logic. | Source says spaces under maintenance, closed, or retired cannot be booked; BR-10/BR-19. Logical §2.5 and §4 classify this as cross-table logic using `SPACE.current_status` and possibly `MAINTENANCE_RECORD`. | Implement a cross-table validation rule preventing bookings when `SPACE.current_status` is `Under maintenance`, `Temporarily closed`, or `Retired`, and clarify how active maintenance records affect space status. |
+| L-03 | Medium | Role-based action restrictions require implementation logic beyond FK constraints. | Source says approval may be by facility staff/manager, and facility staff check in and complete bookings. Logical §2.6/§2.7 and §4 classify decision/check-in/completion role restrictions as implementation logic. | Enforce role checks in triggers, stored procedures, service-layer transactions, or authorization policy before inserting/updating decision and usage-session rows. |
+| L-04 | Medium | Maintenance status values and maintenance-to-space-status synchronization remain unresolved. | Analysis §13 asks for maintenance status values/transitions and whether maintenance status updates Space current status. Logical §2.8 and §6 carry these as open questions. | Obtain stakeholder clarification before implementing maintenance lifecycle checks or automated space-status synchronization. |
+| L-05 | Low | `USER_ACCOUNT.account_status` has no allowed-value CHECK because upstream values are not provided. | Source names account status but gives no values; logical §2.1 and §6 carry this as unresolved. | Ask stakeholders for account-status values if controlled account lifecycle behavior is required. |
+| L-06 | Low | Participant count versus capacity is intentionally not enforced because it is not a stated requirement. | Source stores capacity and expected participants but does not say expected participants must not exceed capacity; logical §4 and §6 carry this as an open question. | Do not add this rule unless stakeholders confirm it; if confirmed, enforce with cross-table validation. |
 
 ---
 
-# 6. Required Validation Areas Checklist
-
-| Area | Result | Evidence / Comment |
-|---|---|---|
-| 1. Requirement coverage | Pass | BR-01–BR-25 cover the Facility Manager summary. |
-| 2. Actor coverage | Pass | Student, Lecturer, Teaching Assistant, Facility Staff, Department Administrator, Facility Manager appear in analysis §3 and role CHECK. |
-| 3. Entity coverage | Pass | All major source entities are represented through seven conceptual entities and logical tables. |
-| 4. Attribute coverage | Pass | Source attributes are mapped to conceptual attributes and logical columns; no `facility_description` or booking-level `rejection_reason` invented. |
-| 5. Relationship coverage | Pass | Eleven conceptual relationships are mapped in logical §3. |
-| 6. Cardinality correctness | Conditional | Most cardinalities are correct and conceptual notation is uniform A→B; approval-decision cardinality is over-restricted in conceptual design (C-01). |
-| 7. Participation constraints | Pass with condition | Participation is documented bidirectionally; approval-decision participation needs confirmation due C-01. |
-| 8. Primary keys | Pass | Every logical table has a named surrogate `INT IDENTITY` PK. |
-| 9. Foreign keys | Pass | Every FK column is `INT` and references a surrogate `INT` parent PK. |
-| 10. Candidate keys | Pass | `user_id`, `email`, and `unique_space_code` have named UNIQUE constraints. |
-| 11. Key constraints | Pass | PK/UQ/FK naming is complete; no unsupported uniqueness on facility name, space name, or approval booking FK. |
-| 12. Business rule enforcement | Conditional | Ordinary constraints cover keys/enums/in-row rules; cross-row/cross-table rules require implementation logic. |
-| 13. SQL implementation risks | Pass | Logical §4 and §6 identify overlap, unavailable-space, role, lifecycle, and capacity risks. |
-| 14. Assumptions and unresolved questions | Pass | Assumptions and Open Questions are carried forward individually. |
-| 15. Simple in-row CHECK constraints | Pass | `CK_BOOKING_REQUEST_requested_time_order`, `CK_USAGE_SESSION_actual_time_order`, `CK_MAINTENANCE_RECORD_time_order`, and `CK_APPROVAL_DECISION_rejection_reason` are present. |
-| 16. Constraint-strength vs source | Pass | Note fields such as `decision_note`, `usage_notes`, and `result_note` are nullable; values are not made stronger than source evidence. |
-| 17. Consistent inference labeling | Pass | `decision_outcome` is tagged as derived in analysis/conceptual assumptions and carried consistently. |
-| 18. FK referential actions | Pass | All FKs include explicit `ON DELETE`/`ON UPDATE` actions and reasoning. |
-| 19. Constraint naming completeness | Pass | All PK/FK/UQ/CK constraints are named; rejected-decision rule is a named CHECK. |
-| 20. Approval-decision cardinality | Conditional | Logical design correctly avoids UNIQUE on `APPROVAL_DECISION.booking_id`; conceptual cardinality must be corrected or justified. |
-| 21. Cancelled/No-show classification | Pass | Missing triggers are accepted as scoped Open Questions, not reported as a data-modeling defect. |
-| 22. Surrogate-INTEGER PK standardization | Pass | Every table uses surrogate `INT` PKs; natural identifiers are demoted and unique; FKs target surrogate PKs. |
-
----
-
-# 7. Business Rule Enforcement Matrix
+## 6. Business Rule Enforcement Matrix
 
 | Business Rule | Requirement Evidence | Covered in Analysis | Modeled in ERD | Represented in Logical Schema | Enforced in DDL | Risk Level | Recommendation |
 |---|---|---|---|---|---|---|---|
-| BR-01 User account required | Facility Manager user paragraph: each user must have a university account. | Yes | User entity | `USER_ACCOUNT` PK, `user_id`, `email` | Not yet; DDL pending | Low | Implement PK/UQ constraints as specified. |
-| BR-02 Store user info | Same paragraph lists user ID, name, email, phone, role, department, status. | Yes | User attributes | `USER_ACCOUNT` columns | Not yet | Low | Implement columns and role/account constraints as documented. |
-| BR-03 User roles | Same paragraph lists six roles. | Yes | User `role` | `CK_USER_ACCOUNT_role` | Not yet | Low | Implement named CHECK. |
-| BR-04 Manage bookable spaces | Facility Manager space paragraph says School manages many bookable spaces. | Yes | Space entity | `SPACE` table | Not yet | Low | Implement table. |
-| BR-05 Store space details | Space paragraph lists unique code, name, type, building, floor, room, capacity, status, usage policy. | Yes | Space attributes | `SPACE` columns; `UQ_SPACE_unique_space_code` | Not yet | Low | Implement columns and unique code. |
-| BR-06 Space statuses | Space paragraph lists available, in use, under maintenance, temporarily closed, retired. | Yes | Space `current_status` | `CK_SPACE_current_status` | Not yet | Low | Implement named CHECK. |
-| BR-07 Space facilities | Facilities paragraph says each space may have several facilities and stores list. | Yes | M:N Space–Facility | `SPACE_FACILITY` with FKs and UQ pair | Not yet | Low | Implement junction table. |
-| BR-08 Submit booking | Booking paragraph lists selected space, requested times, purpose, expected participants. | Yes | User–Booking and Space–Booking relationships | `BOOKING_REQUEST` FKs and columns | Not yet | Low | Implement FKs and in-row time CHECK. |
-| BR-09 Booking purpose values | Booking paragraph lists lecture, examination, seminar, workshop, meeting, student activity, administrative event. | Yes | Booking attribute | `CK_BOOKING_REQUEST_purpose_of_use` | Not yet | Low | Implement named CHECK. |
-| BR-10 Booking statuses | Booking paragraph lists pending, approved, rejected, cancelled, checked in, completed, no-show. | Yes | Booking attribute | `CK_BOOKING_REQUEST_booking_status` | Not yet | Medium | Implement CHECK; do not invent cancelled/no-show transitions. |
-| BR-11 Prevent conflicts | Booking paragraph says system must prevent conflicting bookings. | Yes | Booking times + selected Space | Classified as implementation logic | Not yet | High | Implement trigger/procedure/transaction rule. |
-| BR-12 No overlapping approved bookings | Booking paragraph says same space cannot have two approved overlapping bookings. | Yes | Space–Booking + requested times/status | Classified as implementation logic | Not yet | High | Enforce with SQL Server trigger/procedure or transaction-safe service logic. |
-| BR-13 Cannot book unavailable spaces | Booking paragraph says under maintenance, closed/retired spaces cannot be booked; status list uses temporarily closed. | Yes | Space status + Booking relationship | Classified as cross-table implementation logic | Not yet | High | Enforce during insert/update/approval. |
-| BR-14 Approval may be required | Approval paragraph says booking may require approval from facility staff or manager. | Yes | Booking–Approval and User–Decision | Optional `APPROVAL_DECISION`; approval-required criteria open | Not yet | Medium | Clarify approval criteria; implement role check. |
-| BR-15 Store decision maker/time/note | Approval paragraph says approved/rejected decisions record staff member, time, note. | Yes | Approval Decision + User makes decision | `APPROVAL_DECISION` columns and FK | Not yet | Medium | Implement columns/FK and role validation. |
-| BR-16 Rejection reason if rejected | Approval paragraph says rejection reason should be stored if rejected. | Yes | Approval Decision `rejection_reason` | `CK_APPROVAL_DECISION_rejection_reason` | Not yet | Low | Implement named CHECK exactly. |
-| BR-17 Facility staff check in | Usage paragraph says facility staff can check in booking. | Yes | User checks in Usage Session | `USAGE_SESSION.checked_in_by_user_account_id` FK; role logic required | Not yet | Medium | Implement Facility Staff role check. |
-| BR-18 Store check-in details | Usage paragraph lists actual start, check-in person, initial condition. | Yes | Usage Session attributes + CHECKED_IN_BY | `USAGE_SESSION` columns/FK | Not yet | Low | Implement columns/FK. |
-| BR-19 Store completion details | Usage paragraph lists actual end, final condition, usage notes. | Yes | Usage Session attributes + COMPLETED_BY | nullable completion columns, FK, time CHECK | Not yet | Medium | Implement completion role and consistency checks. |
-| BR-20 Maintenance management | Maintenance paragraph says system supports basic maintenance management. | Yes | Maintenance Record entity | `MAINTENANCE_RECORD` table | Not yet | Low | Implement table. |
-| BR-21 Maintenance problems | Maintenance paragraph gives problem examples. | Yes | Maintenance Record `problem_description` | `problem_description` column | Not yet | Low | Implement column without over-constraining examples. |
-| BR-22 Store maintenance record details | Maintenance paragraph lists related space, reporter, assigned staff, description, times, status, result note. | Yes | Maintenance relationships and attributes | FKs and columns; time CHECK | Not yet | Medium | Implement FKs; clarify status values/role scope. |
-| BR-23 Space under maintenance cannot be booked | Maintenance paragraph repeats under-maintenance booking prohibition. | Yes | Space status + Booking | Cross-table implementation logic | Not yet | High | Enforce with BR-13 unavailable-space rule. |
-| BR-24 Preserve history | History paragraph says keep booking and maintenance history. | Yes | Booking/Approval/Usage/Maintenance entities | Historical tables; FK `ON DELETE NO ACTION` | Not yet | Medium | Implement deletion restrictions. |
-| BR-25 Staff views | History paragraph says staff view booking history, upcoming bookings, spaces under maintenance, no-show bookings. | Yes | Data entities support views | Query/view support possible; authorization scope open | Not yet | Medium | Implement views/queries and clarify staff scope. |
+| BR-1 User account and stored user info | Facility Manager summary: each user has a university account; stores user ID, full name, email, phone, role, department, account status. | Yes, BR-1/User entity | Yes, `USER` | Yes, `USER_ACCOUNT` | DDL-ready via columns, PK/UQ; account-status value list unresolved | Low | Clarify account-status values if a controlled status domain is needed. |
+| BR-2 User roles | Facility Manager summary lists student, lecturer, teaching assistant, facility staff, department administrator, facility manager. | Yes, BR-2 | Yes, `USER.role` | Yes, `CK_USER_ACCOUNT_role` | Yes | Low | Implement authorization using the stored role. |
+| BR-3 Space details | Facility Manager summary stores unique code, name, type, building, floor, room, capacity, current status, usage policy. | Yes, BR-3/Space | Yes, `SPACE` | Yes, `SPACE`, `UQ_SPACE_unique_space_code`, capacity CHECK | Mostly yes; usage-policy enforcement unresolved | Low | Keep `space_type` open; clarify usage-policy enforcement if needed. |
+| BR-4 Space status values | Summary lists available, in use, under maintenance, temporarily closed, retired. | Yes, BR-4 | Yes, `SPACE.current_status` | Yes, `CK_SPACE_current_status` | Yes | Low | None beyond implementation use of status. |
+| BR-5 Space facilities | Summary says each space may have several facilities and stores the list. | Yes, BR-5 | Yes, M:N `HAS_FACILITY` | Yes, `SPACE_FACILITY` | Yes via FKs/UQ | Low | Preserve open facility catalog. |
+| BR-6 Booking submission facts | Summary says users select space, requested start/end, purpose, participants. | Yes, BR-6 | Yes, `BOOKING_REQUEST`, `SUBMITS`, `SELECTS_SPACE` | Yes, FKs and columns | Yes for structure and time order | Low | None. |
+| BR-7 Purpose of use values | Summary lists lecture, examination, seminar, workshop, meeting, student activity, administrative event. | Yes, BR-7 | Yes, `purpose_of_use` only | Yes, `CK_BOOKING_REQUEST_purpose_of_use` | Yes | Low | Do not add duplicate booking type/category. |
+| BR-8 Booking status values | Summary lists pending, approved, rejected, cancelled, checked in, completed, no-show. | Yes, BR-8; transition gaps scoped | Yes, `status` | Yes, `CK_BOOKING_REQUEST_status` | Values yes; transitions partial | Medium | Implement only supported transitions; keep Cancelled/No-show triggers as workflow clarification. |
+| BR-9 Prevent overlapping approved bookings | Summary: same space cannot have two approved overlapping bookings. | Yes, BR-9 | Represented by booking time/status/space | Represented by columns | Not by ordinary DDL; requires trigger/procedure/transaction | High | Implement overlap validation and concurrency-safe tests. |
+| BR-10 Cannot book unavailable spaces | Summary: under maintenance, closed, retired spaces cannot be booked. | Yes, BR-10 | Represented by Space status and booking-space relationship | Represented by FK and status column | Requires cross-table logic | High | Implement status-based booking validation. |
+| BR-11 Approval by facility staff/manager | Summary: booking may require approval from facility staff member or manager. | Yes, BR-11 | Yes, `HAS_APPROVAL_DECISION`, `MADE_BY` | Yes, decision-maker FK | Role restriction requires implementation logic | Medium | Enforce permitted decision-maker roles. |
+| BR-12 Decision details | Summary records staff member, decision time, decision note. | Yes, BR-12 | Yes, Approval Decision attributes and `MADE_BY` | Yes, `APPROVAL_DECISION` | Mostly yes; role via implementation | Medium | Keep decision note nullable unless mandatory content is clarified. |
+| BR-13 Rejection reason | Summary: if rejected, rejection reason should be stored. | Yes, BR-13 | Yes, `rejection_reason` | Yes, `CK_APPROVAL_DECISION_rejection_reason` | Yes | Low | Confirm physical DDL keeps the named CHECK. |
+| BR-14 Check-in action | Summary: facility staff can check in booking. | Yes, BR-14 | Yes, `HAS_USAGE_SESSION`, `CHECKED_IN_BY` | Yes, usage-session row and FK | Role restriction requires implementation logic | Medium | Enforce facility-staff check-in role. |
+| BR-15 Check-in details | Summary records actual start, person, initial condition. | Yes, BR-15 | Yes, Usage Session attributes | Yes, NOT NULL fields and FK | Yes, plus role logic | Medium | Keep role validation in implementation. |
+| BR-16 Completion details | Summary records actual end, final condition, usage notes. | Yes, BR-16 | Yes, Usage Session attributes and `COMPLETED_BY` | Yes, nullable lifecycle fields and CHECKs | In-row yes; role via implementation | Medium | Ensure completion updates set completion fields consistently. |
+| BR-17 Maintenance problem records | Summary lists maintenance problem examples. | Yes, BR-17 | Yes, Maintenance Record | Yes, `MAINTENANCE_RECORD` | Yes structurally | Low | Keep problem descriptions flexible. |
+| BR-18 Maintenance record details | Summary stores related space, reporter, assigned staff, problem, times, status, result note. | Yes, BR-18 | Yes, relationships and attributes | Yes, FKs/columns and time CHECK | Partial; status values unresolved | Medium | Clarify status vocabulary and role eligibility. |
+| BR-19 Space under maintenance cannot be booked | Summary repeats this rule. | Yes, BR-19 | Represented by Space/Maintenance/Booking relationships | Represented by status and FKs | Requires cross-table logic | High | Coordinate with BR-10 validation and maintenance synchronization. |
+| BR-20 Historical records | Summary says keep historical bookings and maintenance activities. | Yes, BR-20 | Yes, event/record entities | Yes, separate history tables and `ON DELETE NO ACTION` | Yes by referential actions | Low | Avoid destructive deletes of historical parents. |
+| BR-21 Staff views | Summary says staff should view history, upcoming bookings, spaces under maintenance, no-show bookings. | Yes, BR-21 | Data is modeled | Data is queryable | Query/authorization implementation required | Low | Implement views/queries and authorization later. |
 
 ---
 
-# 8. Requirement Coverage Matrix
+## 7. Requirement Coverage Matrix
 
 | Requirement | Conceptual Coverage | Logical Coverage | Validation Result |
 |------|------|------|------|
-| User accounts and roles | User entity and attributes | `USER_ACCOUNT`, role CHECK, user/email UQ | Covered |
-| Space details and status | Space entity and attributes | `SPACE`, status CHECK, unique space code | Covered |
-| Facilities in spaces | Space–Facility M:N | `SPACE_FACILITY` junction | Covered |
-| Booking requests | User–Booking and Space–Booking relationships | `BOOKING_REQUEST` with requester/space FKs | Covered |
-| Booking conflicts and unavailable spaces | Represented conceptually by Space/Booking/time/status | Classified as implementation logic | Covered with implementation condition |
-| Approval decisions | Approval Decision entity and relationships | `APPROVAL_DECISION` with decision-maker FK and checks | Covered with cardinality clarification condition |
-| Usage sessions | Usage Session entity and distinct role relationships | `USAGE_SESSION` with distinct check-in/completion FKs | Covered |
-| Maintenance records | Maintenance Record entity and relationships | `MAINTENANCE_RECORD` with space/reporter/assignee FKs | Covered with status/role open questions |
-| Historical records and staff views | Historical entities retained | `ON DELETE NO ACTION` choices; views deferred | Covered with implementation condition |
+| User and roles | `USER` entity and role values | `USER_ACCOUNT`, role CHECK, user/email UNIQUE | Covered |
+| Space and status | `SPACE` entity | `SPACE`, current-status CHECK, unique space code | Covered |
+| Facilities per space | M:N `HAS_FACILITY` | `SPACE_FACILITY` junction | Covered |
+| Booking request | `BOOKING_REQUEST`, `SUBMITS`, `SELECTS_SPACE` | `BOOKING_REQUEST` FKs and time/purpose/status checks | Covered |
+| Approval decision history | `APPROVAL_DECISION`, `HAS_APPROVAL_DECISION`, `MADE_BY` | `APPROVAL_DECISION` with non-unique `booking_id` | Covered |
+| Usage session | `USAGE_SESSION`, `HAS_USAGE_SESSION`, role relationships | `USAGE_SESSION` with unique `booking_id` and role FKs | Covered |
+| Maintenance records | `MAINTENANCE_RECORD`, space/user relationships | `MAINTENANCE_RECORD` FKs and time CHECK | Covered with open status questions |
+| Historical preservation | Separate event/record entities | `ON DELETE NO ACTION` on historical/master references | Covered |
+| Cross-row/cross-table restrictions | Identified and deferred | Classified as implementation logic | Covered with conditions |
 
 ---
 
-# 9. Recommendations
+## 8. Required Validation Area Checklist
+
+| Area | Result | Evidence |
+|---|---|---|
+| Requirement, actor, entity, attribute, relationship coverage | Pass | Analysis §§3-6; conceptual §§3-5; logical §§2-4. |
+| Cardinality and participation | Pass | Conceptual §4 uses uniform Entity-A → Entity-B order; logical §3 maps each relationship. |
+| Primary keys and surrogate-INT standardization | Pass | Logical §2.0 and per-table `PK_...` constraints. |
+| Foreign keys and FK data types | Pass | Logical FK columns are `INT` to surrogate `INT` PKs; no FK targets `user_id` or `unique_space_code`. |
+| Candidate keys | Pass | `UQ_USER_ACCOUNT_user_id`, `UQ_USER_ACCOUNT_email`, `UQ_SPACE_unique_space_code`. |
+| In-row CHECK constraints | Pass | Time-order checks and `CK_APPROVAL_DECISION_rejection_reason` are present. |
+| Constraint-strength vs source | Pass | Optional notes such as `decision_note` and `usage_notes` are nullable; open value lists are not over-constrained. |
+| Consistent inference labeling | Pass | Proposed identifiers and derived `decision_outcome` are labeled and assumed upstream; logical carries them forward. |
+| FK referential actions | Pass | All FK definitions state `ON DELETE`/`ON UPDATE` and criteria. |
+| Constraint naming completeness | Pass | All listed PK/FK/UQ/CK constraints are named. |
+| Approval-decision cardinality | Pass | `APPROVAL_DECISION.booking_id` is non-unique; `HAS_APPROVAL_DECISION` remains `1..1 to 0..*`. |
+| Cancelled/No-show handling | Pass | Treated as status values with scoped workflow open questions, not asserted transitions. |
+| Duplicate value-list scan | Pass | No booking type/category; only `purpose_of_use` holds purpose values. |
+| Single-actor role-FK sweep | Pass | Decision maker, check-in, completion, reporter, assignment all have at-most-one actor per event. |
+| Singleton-by-nature resolution | Pass | Booking → Usage Session resolved `0..1`; logical `UQ_USAGE_SESSION_booking_id` is correct. |
+
+---
+
+## 9. Recommendations
 
 | Priority | Recommendation | Related Issue(s) |
 |------|------|------|
-| High | In the DDL stage, implement and test cross-row/cross-table rules: approved booking overlap prevention, unavailable-space booking prevention, approval-maker role restriction, and check-in/completion role restriction. | L-02 |
-| Medium | Resolve approval-decision cardinality. Unless stakeholders explicitly require one decision per booking, keep logical `APPROVAL_DECISION.booking_id` non-unique and update future conceptual documentation to `1 to 0..*`. | C-01, L-01 |
-| Medium | Clarify maintenance status values/transitions, active maintenance-to-space-status synchronization, capacity comparison, account status values, and staff-view authorization scope before adding further constraints. | L-03 |
-| Low | Preserve the current constraint naming, surrogate-key, FK action, and nullable-note discipline during DDL implementation. | General |
+| High | Implement concurrency-safe prevention of overlapping approved bookings for the same space and requested time window. | L-01 |
+| High | Implement cross-table validation preventing booking of spaces that are under maintenance, temporarily closed/closed, or retired. | L-02 |
+| Medium | Implement role checks for approval, check-in, completion, maintenance reporting, and maintenance assignment where stakeholder rules are known. | L-03, L-06 |
+| Medium | Clarify maintenance status vocabulary and whether maintenance records synchronize `SPACE.current_status`. | L-04 |
+| Low | Clarify `USER_ACCOUNT.account_status` values before adding an account-status CHECK. | L-05 |
+| Low | Do not add participant-count-vs-capacity enforcement unless stakeholders confirm it. | L-06 |
 
 ---
 
-# 10. Final Conclusion
+## 10. Final Conclusion
 
-## Final Decision
+### Final Decision
 
 **ACCEPTED WITH CONDITIONS**
 
 ### Conclusion
 
-The submitted requirement analysis, conceptual design, and logical design cover the core business requirements for campus space booking, approval, usage, maintenance, facilities, and history. The logical design is implementation-ready in structure: it uses surrogate `INT` keys, type-matched FKs, named constraints, in-row CHECK constraints, evidence-based uniqueness, and explicit referential actions. The design should proceed to database implementation only with the conditions that cross-row/cross-table rules are implemented in SQL Server or transaction-safe application logic, and the approval-decision history cardinality is clarified or corrected in documentation.
+The submitted business analysis, conceptual design, and logical design satisfy the documented business requirements and follow the project rules for traceability, cardinality, surrogate keys, FK typing, constraint naming, and in-row CHECK constraints. The design should proceed to implementation only with the conditions that cross-row/cross-table integrity rules and role-based authorization rules are implemented and tested explicitly. No redesign is required before implementation.
