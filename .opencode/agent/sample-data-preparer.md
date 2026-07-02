@@ -22,7 +22,7 @@ The SQL file must start with a comment header that includes:
 - `Execution Assumption`
 - `Assumptions Carried Forward`
 - `Open Questions Carried Forward`
-- `Trigger Compliance`
+- `Trigger Compliance` (Phase 1: state "No triggers implemented in Phase 1; sample data only needs to satisfy PK/FK/UNIQUE/NOT NULL/CHECK.")
 - `Sample Coverage / Traceability`
 
 The SQL file must include realistic records for the implemented schema. Required coverage includes:
@@ -98,9 +98,6 @@ Before writing the final SQL, confirm:
 - Inserts follow dependency order.
 - Every FK parent row exists before child rows are inserted.
 - Every role, booking status, space status, and booking type matches the DDL exactly.
-- Bookings do not reference unavailable spaces if the DDL trigger forbids it.
-- Approved bookings for the same space do not overlap if the DDL trigger forbids it.
-- Approval decision makers satisfy trigger role requirements.
 - Rejected bookings that have approval decisions include a non-empty rejection reason.
-- Usage sessions satisfy check-in/completion trigger requirements.
 - The output includes assumptions, open questions, trigger compliance, and sample coverage traceability.
+- (Phase 1: no triggers exist, so no trigger-based checks apply. Still keep data logically realistic — e.g. approved bookings non-overlapping, decision makers being staff — but this is convention, not enforced.)

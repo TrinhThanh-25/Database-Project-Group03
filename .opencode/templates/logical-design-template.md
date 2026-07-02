@@ -8,6 +8,8 @@ This document presents the logical database design for the [System Name] project
 
 ## 2. Relational Schema
 
+[Logical diagram mermaid]
+
 Conventions:
 - SQL Server data types are logical recommendations and may be refined during physical implementation.
 - `NOT NULL` is used where the upstream conceptual design and business rules require the fact to exist at row creation.

@@ -382,6 +382,45 @@ Questions must agree.
 #### 2. Specific Terms
 - Layer A and Layer B are the terms that must be defined in Section 2.2. The definitions must be consistent with the source text and the context of the requirement analysis.
 
+### Rule 10 — Authorized design directive: DEPARTMENT entity and controlled-vocabulary entities (scoped exception to no-invent)
+
+Apply the following even though the source text does not state it. It is an explicit stakeholder/design directive; record it under Assumptions labeled `[design directive]`, never as a source-grounded rule. This is a scoped exception to Rules 1, 2 and 3 for these specific elements only — all other extraction stays strictly source-grounded.
+
+#### 1. DEPARTMENT entity
+
+- Model DEPARTMENT as its own entity, normalized out of the `department` user attribute. Attributes: a department identifier and `department_name`. Remove the plain `department` attribute from USER_ACCOUNT and represent the link as a relationship `USER_ACCOUNT belongs_to DEPARTMENT` (each user belongs to exactly one department).
+- DEPARTMENT has one managing user: relationship `DEPARTMENT is_managed_by USER_ACCOUNT` (0..1 managing user per department; a user may manage 0..* departments). This managing-user link is a directive, not source-stated — flag it as an Assumption.
+
+#### 2. Controlled-vocabulary (enum) entities
+
+The following enumerated values must each be modeled as its own entity (like an enum/lookup table), NOT left as plain string attributes on the owning entity:
+
+| Enum entity | Attributes | Replaces attribute on |
+|---|---|---|
+| ROLE | role identifier, role_name | USER_ACCOUNT.role |
+| ACCOUNT_STATUS | status identifier, status_name | USER_ACCOUNT.account_status |
+| SPACE_STATUS | status identifier, status_name | SPACE.current_status |
+| BOOKING_STATUS | status identifier, status_name | BOOKING_REQUEST.status |
+| MAINTENANCE_STATUS | status identifier, status_name | MAINTENANCE_RECORD.status |
+| BOOKING_STATUS | (also used by APPROVAL_DECISION.decision_outcome — see section 3) | BOOKING_REQUEST.status |
+
+For each:
+- Create the entity with an identifier attribute and a name attribute.
+- Remove the original string attribute from the owning entity.
+- Replace it with a relationship to the enum entity (e.g. `USER_ACCOUNT has_role ROLE`, `BOOKING_REQUEST has_status BOOKING_STATUS`).
+- The relationship is mandatory on the owning-entity side (every user must have a role, every booking must have a status) and optional-many on the enum side (one role value may be used by zero or many users).
+- Record each enum entity as an Assumption labeled `[design directive]`.
+
+#### 3. decision_outcome shares BOOKING_STATUS (no separate entity)
+
+`APPROVAL_DECISION.decision_outcome` references the same `BOOKING_STATUS` lookup entity as `BOOKING_REQUEST.status`. Do NOT create a separate entity for decision outcome values.
+
+Add the following relationship to §5 Relationships and Cardinalities:
+- `APPROVAL_DECISION has_decision_outcome BOOKING_STATUS` — each approval decision records exactly one outcome (`approved` or `rejected`); one BOOKING_STATUS value may be referenced by many or no approval decisions.
+- Cardinality: `APPROVAL_DECISION 1..1 — BOOKING_STATUS 0..*`
+
+Record under Assumptions: `decision_outcome` on `APPROVAL_DECISION` references `BOOKING_STATUS` to share the same value set as `BOOKING_REQUEST.status`; only `approved` and `rejected` are meaningful as decision outcomes but the domain is not restricted at this stage — this is an accepted Phase 1 trade-off.
+
 
 ## Workflow
 

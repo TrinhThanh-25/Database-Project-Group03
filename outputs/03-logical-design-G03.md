@@ -1,350 +1,560 @@
 # Logical Database Design - Group 03
 
-## 1. Introduction
+## 1. Source Documents and Path Discrepancies
 
-This document presents the logical database design for the Campus Space Management System project. The design transforms the conceptual schema from `outputs/02-erd-design-G03.md` into a SQL Server-oriented relational schema and uses `outputs/01-business-req-analysis-G03.md` only for traceability checks, assumptions, and open questions.
+This logical design transforms the Step 2 conceptual design into a SQL Server-oriented relational schema.
 
-## 1.1 Source documents and path discrepancies
+| Source | Required / Contract Path | Used Path | Purpose | Discrepancy |
+|---|---|---|---|---|
+| Project routing contract | `AGENTS.md` | `AGENTS.md` | Output-path and workflow contract | None |
+| Step 2 conceptual design | `outputs/02-erd-design-G03.md` | `outputs/02-erd-design-G03.md` | Primary input for entities, attributes, relationships, and cardinalities | None |
+| Step 1 requirement analysis | `outputs/01-business-req-analysis-G03.md` | `outputs/01-business-req-analysis-G03.md` | Traceability, assumptions, and open questions only | None |
+| Logical output | `outputs/03-logical-design-G03.md` | `outputs/03-logical-design-G03.md` | Final output of this stage | None |
 
-| Source | Required / expected path | Used? | Notes |
-|---|---|---:|---|
-| Project routing contract | `AGENTS.md` | Yes | Confirms Step 2 output path as `outputs/02-erd-design-G03.md` and Step 3 output path as `outputs/03-logical-design-G03.md`. |
-| Conceptual database design | `outputs/02-erd-design-G03.md` | Yes | Primary input. No path discrepancy found. |
-| Business requirement analysis | `outputs/01-business-req-analysis-G03.md` | Yes | Used for traceability checks and carried-forward assumptions/open questions only. |
-| Logical design output | `outputs/03-logical-design-G03.md` | Yes | This document. |
+Traceability inventory used before drafting:
 
-No source path discrepancy was found.
+- Conceptual entities mapped: `USER_ACCOUNT`, `DEPARTMENT`, `ROLE`, `ACCOUNT_STATUS`, `SPACE`, `SPACE_STATUS`, `FACILITY`, `BOOKING_REQUEST`, `BOOKING_STATUS`, `APPROVAL_DECISION`, `USAGE_SESSION`, `MAINTENANCE_RECORD`, `MAINTENANCE_STATUS`.
+- Conceptual M:N relationship resolved: `SPACE`–`FACILITY` via `SPACE_FACILITY`.
+- Conceptual relationships mapped: `BELONGS_TO`, `IS_MANAGED_BY`, `HAS_ROLE`, `HAS_ACCOUNT_STATUS`, `HAS_SPACE_STATUS`, `HAS_BOOKING_STATUS`, `HAS_DECISION_OUTCOME`, `HAS_MAINTENANCE_STATUS`, `HAS_FACILITY`, `SUBMITS`, `SELECTS`, `HAS_APPROVAL_DECISION`, `MAKES_DECISION`, `HAS_USAGE_SESSION`, `CHECKS_IN`, `COMPLETES`, `HAS_MAINTENANCE_RECORD`, `REPORTS`, `ASSIGNED_TO`.
 
 ## 2. Relational Schema
 
-### 2.0 Design conventions, key policy, and referential-action criteria
+### 2.0 Logical Conventions and Constraint Criteria
 
-**Primary-key standardization.** Every table uses a system-generated surrogate `INT IDENTITY(1,1)` primary key with a named `PK_...` constraint. Natural/business identifiers from the conceptual model, such as `USER.user_id` and `SPACE.unique_space_code`, are demoted to regular attributes and protected by named `UNIQUE` constraints. Surrogate `INT` keys are used for all primary/foreign-key relationships for storage efficiency, join performance, and stability. If a natural key value must be corrected, it is a single-row update on a `UNIQUE` attribute because no foreign key references that natural key.
+**Primary-key standardization.** Every table uses a system-generated surrogate `INT IDENTITY(1,1)` primary key with a named `PK_...` constraint. Natural/business identifiers from the conceptual model, such as `USER_ACCOUNT.user_id` and `SPACE.unique_space_code`, are demoted to regular attributes and protected with named `UNIQUE` constraints. All foreign keys reference surrogate `INT` primary keys, never demoted natural keys. This improves storage efficiency, join performance, and key stability: if a natural value such as a student code or space code needs correction, only the row containing that `UNIQUE` business attribute changes and no referencing rows need cascading updates.
 
-**Conceptual proposed identifiers.** Conceptual identifiers that were already proposed because the source did not name a business identifier (`booking_id`, `facility_id`, `approval_decision_id`, `usage_session_id`, `maintenance_record_id`) are implemented as the mandatory logical surrogate `INT IDENTITY` primary keys, not duplicated as unsupported separate business-key columns.
+**Foreign-key referential actions.** Every FK uses explicit actions:
 
-**Foreign-key referential actions.** Every FK references the parent surrogate `INT` PK and declares explicit actions:
-- `ON DELETE CASCADE` is used only for pure current-state association rows with no independent historical/audit value, specifically `SPACE_FACILITY`.
-- `ON DELETE NO ACTION` is used for references to master or historical/audit records where deletion would erase or orphan booking, decision, usage, or maintenance history, consistent with BR-20 historical-record preservation. Optional actor FKs also use `NO ACTION` rather than `SET NULL` because preserving who acted is more important than allowing actor deletion.
-- `ON UPDATE NO ACTION` is used uniformly for every FK because all referenced PKs are immutable surrogate `INT` values. Natural-key corrections do not require cascades because natural keys are not FK targets.
+- `ON DELETE CASCADE` is used only for pure current-state association rows with no audit/history value: `SPACE_FACILITY`.
+- `ON DELETE NO ACTION` is used for master data and all historical/audit-bearing relationships so deleting parent rows cannot erase or orphan booking, decision, usage, or maintenance history (`BR-20`). Optional actor FKs also use `NO ACTION` rather than `SET NULL` because preserving who acted is more important than allowing actor deletion.
+- `ON UPDATE NO ACTION` is used uniformly because all referenced primary keys are immutable surrogate `INT` values. Natural-key corrections occur on non-referenced `UNIQUE` attributes.
 
-**Allowed-value CHECK classification.** Closed control vocabularies with available upstream values get named CHECK constraints: `USER_ACCOUNT.role`, `SPACE.current_status`, `BOOKING_REQUEST.purpose_of_use`, `BOOKING_REQUEST.status`, and `APPROVAL_DECISION.decision_outcome`. Open descriptive catalogs do not get fixed-list CHECKs: `SPACE.space_type` and `FACILITY.facility_name` are expected to grow. `USER_ACCOUNT.account_status` and `MAINTENANCE_RECORD.status` have no upstream value list, so they remain unconstrained and are carried as Open Questions.
+**Closed/open value classification.** Closed controlled vocabularies that govern authorization or lifecycle (`ROLE`, `ACCOUNT_STATUS`, `SPACE_STATUS`, `BOOKING_STATUS`, `MAINTENANCE_STATUS`) are implemented as lookup/reference tables with `UNIQUE` name columns; no allowed-value `CHECK` duplicates those FKs. `purpose_of_use` is a closed process category with listed values and is implemented as a named `CHECK`. Open descriptive catalogs (`space_type`, `facility_name`) are left unconstrained because deployments may add valid values.
 
-### 2.1 `USER_ACCOUNT`
+**Unresolved implementation rules.** Cross-row/cross-table rules that ordinary SQL Server PK/FK/UNIQUE/CHECK constraints cannot fully enforce are listed under the relevant tables and classified in §4.
 
-Logical table for conceptual `USER`; table name avoids the reserved/generic word `USER`.
+### 2.1 `ROLE`
+
+Source entity: controlled user role values.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `user_account_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK | Logical-stage surrogate key policy |
-| `user_id` | `NVARCHAR(50)` | `NOT NULL` | Demoted natural/business identifier; unique | Conceptual `USER.user_id`, BR-1 |
-| `full_name` | `NVARCHAR(200)` | `NOT NULL` | Stored user information | Conceptual `full_name`, BR-1 |
-| `email` | `NVARCHAR(254)` | `NOT NULL` | Candidate key; unique assumption | Conceptual `email`, BR-1 |
-| `phone_number` | `NVARCHAR(30)` | `NULL` | Optional contact detail; source stores it but does not state mandatory strength | Conceptual `phone_number`, BR-1 |
-| `role` | `NVARCHAR(40)` | `NOT NULL` | Closed role vocabulary | Conceptual `role`, BR-2 |
-| `department` | `NVARCHAR(120)` | `NULL` | Optional organizational detail; mandatory strength not stated | Conceptual `department`, BR-1 |
-| `account_status` | `NVARCHAR(40)` | `NOT NULL` | Stored status; no upstream values available for CHECK | Conceptual `account_status`, BR-1 |
+| `role_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual ROLE identifier |
+| `role_name` | `NVARCHAR(80)` | NOT NULL | Controlled role name | ROLE.role_name, BR-02 |
+
+Primary key:
+- `CONSTRAINT PK_ROLE PRIMARY KEY (role_id)`
+
+Uniqueness constraints:
+- `CONSTRAINT UQ_ROLE_role_name UNIQUE (role_name)`
+
+### 2.2 `ACCOUNT_STATUS`
+
+Source entity: controlled user account status values.
+
+| Column | Data Type | Nullability | Constraints / Notes | Source |
+|---|---:|---:|---|---|
+| `account_status_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual ACCOUNT_STATUS identifier |
+| `status_name` | `NVARCHAR(80)` | NOT NULL | Controlled account status name | ACCOUNT_STATUS.status_name, BR-01 |
+
+Primary key:
+- `CONSTRAINT PK_ACCOUNT_STATUS PRIMARY KEY (account_status_id)`
+
+Uniqueness constraints:
+- `CONSTRAINT UQ_ACCOUNT_STATUS_status_name UNIQUE (status_name)`
+
+### 2.3 `DEPARTMENT`
+
+Source entity: department normalized from the user department attribute; includes optional managing user from the design directive.
+
+| Column | Data Type | Nullability | Constraints / Notes | Source |
+|---|---:|---:|---|---|
+| `department_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual DEPARTMENT identifier |
+| `department_name` | `NVARCHAR(150)` | NOT NULL | Unique department name | DEPARTMENT.department_name |
+| `head_user_account_id` | `INT` | NULL | Optional FK to managing user; `INT` matches `USER_ACCOUNT.user_account_id` | `IS_MANAGED_BY` |
+
+Primary key:
+- `CONSTRAINT PK_DEPARTMENT PRIMARY KEY (department_id)`
+
+Foreign keys:
+- `CONSTRAINT FK_DEPARTMENT_head_user_account_id FOREIGN KEY (head_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — optional role FK; deletion is restricted to preserve the managing-user fact where present; update is `NO ACTION` because surrogate PKs are immutable.
+
+Uniqueness constraints:
+- `CONSTRAINT UQ_DEPARTMENT_department_name UNIQUE (department_name)`
+
+### 2.4 `USER_ACCOUNT`
+
+Source entity: university account user.
+
+| Column | Data Type | Nullability | Constraints / Notes | Source |
+|---|---:|---:|---|---|
+| `user_account_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Logical surrogate for USER_ACCOUNT |
+| `user_id` | `NVARCHAR(50)` | NOT NULL | Demoted natural/business identifier; unique | USER_ACCOUNT.user_id, BR-01 |
+| `full_name` | `NVARCHAR(200)` | NOT NULL | Stored basic user information | USER_ACCOUNT.full_name, BR-01 |
+| `email` | `NVARCHAR(254)` | NOT NULL | Candidate key; unique assumption | USER_ACCOUNT.email, BR-01 |
+| `phone_number` | `NVARCHAR(40)` | NOT NULL | Stored basic user information | USER_ACCOUNT.phone_number, BR-01 |
+| `department_id` | `INT` | NOT NULL | FK; `INT` matches `DEPARTMENT.department_id` | `BELONGS_TO` |
+| `role_id` | `INT` | NOT NULL | FK; `INT` matches `ROLE.role_id` | `HAS_ROLE`, BR-02 |
+| `account_status_id` | `INT` | NOT NULL | FK; `INT` matches `ACCOUNT_STATUS.account_status_id` | `HAS_ACCOUNT_STATUS` |
 
 Primary key:
 - `CONSTRAINT PK_USER_ACCOUNT PRIMARY KEY (user_account_id)`
+
+Foreign keys:
+- `CONSTRAINT FK_USER_ACCOUNT_department_id FOREIGN KEY (department_id) REFERENCES DEPARTMENT(department_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — mandatory master-data FK; department deletion is restricted while users reference it; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_USER_ACCOUNT_role_id FOREIGN KEY (role_id) REFERENCES ROLE(role_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — mandatory lookup FK; lookup deletion is restricted while users reference it; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_USER_ACCOUNT_account_status_id FOREIGN KEY (account_status_id) REFERENCES ACCOUNT_STATUS(account_status_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — mandatory lookup FK; lookup deletion is restricted while users reference it; update is `NO ACTION` because surrogate PKs are immutable.
 
 Uniqueness constraints:
 - `CONSTRAINT UQ_USER_ACCOUNT_user_id UNIQUE (user_id)`
 - `CONSTRAINT UQ_USER_ACCOUNT_email UNIQUE (email)`
 
-CHECK constraints:
-- `CONSTRAINT CK_USER_ACCOUNT_role CHECK (role IN ('Student','Lecturer','Teaching Assistant','Facility Staff','Department Administrator','Facility Manager'))`
+### 2.5 `SPACE_STATUS`
 
-Unresolved / implementation rules:
-- No CHECK on `account_status`: no upstream account-status value list is available.
-
-### 2.2 `SPACE`
-
-Logical table for conceptual `SPACE`.
+Source entity: controlled space lifecycle/status values.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `space_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK | Logical-stage surrogate key policy |
-| `unique_space_code` | `NVARCHAR(50)` | `NOT NULL` | Demoted natural/business identifier; unique | Conceptual `unique_space_code`, BR-3 |
-| `space_name` | `NVARCHAR(200)` | `NOT NULL` | Stored space detail | Conceptual `space_name`, BR-3 |
-| `space_type` | `NVARCHAR(80)` | `NOT NULL` | Open descriptive catalog; no fixed-list CHECK | Conceptual `space_type`, BR-3 |
-| `building` | `NVARCHAR(120)` | `NOT NULL` | Stored space detail | Conceptual `building`, BR-3 |
-| `floor` | `NVARCHAR(40)` | `NOT NULL` | Stored space detail | Conceptual `floor`, BR-3 |
-| `room_number` | `NVARCHAR(40)` | `NOT NULL` | Stored space detail | Conceptual `room_number`, BR-3 |
-| `capacity` | `INT` | `NOT NULL` | Positive-capacity CHECK | Conceptual `capacity`, BR-3 |
-| `current_status` | `NVARCHAR(40)` | `NOT NULL` | Closed lifecycle vocabulary | Conceptual `current_status`, BR-4 |
-| `usage_policy` | `NVARCHAR(1000)` | `NULL` | Stored policy text; enforcement unspecified upstream | Conceptual `usage_policy`, BR-3; Open Question |
+| `space_status_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual SPACE_STATUS identifier |
+| `status_name` | `NVARCHAR(80)` | NOT NULL | Controlled status name | SPACE_STATUS.status_name, BR-04 |
+
+Primary key:
+- `CONSTRAINT PK_SPACE_STATUS PRIMARY KEY (space_status_id)`
+
+Uniqueness constraints:
+- `CONSTRAINT UQ_SPACE_STATUS_status_name UNIQUE (status_name)`
+
+### 2.6 `SPACE`
+
+Source entity: bookable shared campus space.
+
+| Column | Data Type | Nullability | Constraints / Notes | Source |
+|---|---:|---:|---|---|
+| `space_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Logical surrogate for SPACE |
+| `unique_space_code` | `NVARCHAR(50)` | NOT NULL | Demoted natural/business identifier; unique | SPACE.unique_space_code, BR-03 |
+| `space_name` | `NVARCHAR(200)` | NOT NULL | Descriptive name; not unique | SPACE.space_name |
+| `space_type` | `NVARCHAR(100)` | NOT NULL | Open descriptive catalog; no CHECK/lookup | SPACE.space_type |
+| `building` | `NVARCHAR(100)` | NOT NULL | Location attribute | SPACE.building |
+| `floor` | `NVARCHAR(50)` | NOT NULL | Location attribute | SPACE.floor |
+| `room_number` | `NVARCHAR(50)` | NOT NULL | Location attribute | SPACE.room_number |
+| `capacity` | `INT` | NOT NULL | Count of capacity | SPACE.capacity |
+| `usage_policy` | `NVARCHAR(1000)` | NOT NULL | Stored policy text; enforcement open | SPACE.usage_policy |
+| `space_status_id` | `INT` | NOT NULL | FK; `INT` matches `SPACE_STATUS.space_status_id` | `HAS_SPACE_STATUS`, BR-04 |
 
 Primary key:
 - `CONSTRAINT PK_SPACE PRIMARY KEY (space_id)`
+
+Foreign keys:
+- `CONSTRAINT FK_SPACE_space_status_id FOREIGN KEY (space_status_id) REFERENCES SPACE_STATUS(space_status_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — mandatory lookup FK; deletion is restricted while spaces reference it; update is `NO ACTION` because surrogate PKs are immutable.
 
 Uniqueness constraints:
 - `CONSTRAINT UQ_SPACE_unique_space_code UNIQUE (unique_space_code)`
 
 CHECK constraints:
 - `CONSTRAINT CK_SPACE_capacity_positive CHECK (capacity > 0)`
-- `CONSTRAINT CK_SPACE_current_status CHECK (current_status IN ('Available','In use','Under maintenance','Temporarily closed','Retired'))`
 
 Unresolved / implementation rules:
-- No CHECK on `space_type`: although upstream examples include classrooms, laboratories, meeting rooms, and auditoriums, `space_type` is an open descriptive catalog expected to grow.
-- `usage_policy` enforcement is unresolved upstream.
+- Enforcement of `usage_policy` against bookings is unresolved upstream and carried as an open question.
+- Preventing booking for under-maintenance, temporarily closed, or retired spaces requires cross-table implementation logic involving `SPACE.space_status_id` and `BOOKING_REQUEST`.
 
-### 2.3 `FACILITY`
+### 2.7 `FACILITY`
 
-Logical table for conceptual `FACILITY`.
+Source entity: facility item available in spaces.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `facility_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK; implements the upstream proposed identifier | Conceptual `facility_id` proposed identifier |
-| `facility_name` | `NVARCHAR(120)` | `NOT NULL` | Open descriptive catalog; no fixed-list CHECK and no unique constraint | Conceptual `facility_name`, BR-5 |
+| `facility_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual FACILITY identifier |
+| `facility_name` | `NVARCHAR(150)` | NOT NULL | Open descriptive catalog; no UNIQUE/CHECK because deployments may repeat/extend labels | FACILITY.facility_name, BR-05 |
 
 Primary key:
 - `CONSTRAINT PK_FACILITY PRIMARY KEY (facility_id)`
 
-Unresolved / implementation rules:
-- No CHECK on `facility_name`: source examples are an open equipment catalog expected to grow.
-- No `facility_description` column is added because no upstream analysis attribute defines it.
+### 2.8 `SPACE_FACILITY`
 
-### 2.4 `SPACE_FACILITY`
-
-Junction table resolving conceptual M:N `HAS_FACILITY` between `SPACE` and `FACILITY`.
+Associative table resolving the conceptual M:N `HAS_FACILITY` relationship.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `space_facility_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK required by project-wide logical rule | Logical-stage surrogate key policy |
-| `space_id` | `INT` | `NOT NULL` | FK to `SPACE(space_id)` | Conceptual `HAS_FACILITY` |
-| `facility_id` | `INT` | `NOT NULL` | FK to `FACILITY(facility_id)` | Conceptual `HAS_FACILITY` |
+| `space_facility_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK for consistency with all-table surrogate PK rule | Logical surrogate for junction table |
+| `space_id` | `INT` | NOT NULL | FK; `INT` matches `SPACE.space_id` | `HAS_FACILITY` |
+| `facility_id` | `INT` | NOT NULL | FK; `INT` matches `FACILITY.facility_id` | `HAS_FACILITY` |
 
 Primary key:
 - `CONSTRAINT PK_SPACE_FACILITY PRIMARY KEY (space_facility_id)`
 
 Foreign keys:
-- `CONSTRAINT FK_SPACE_FACILITY_space_id FOREIGN KEY (space_id) REFERENCES SPACE(space_id) ON DELETE CASCADE ON UPDATE NO ACTION` — pure current-state association row; delete cascades only for this junction; update is no action because PKs are immutable surrogates.
-- `CONSTRAINT FK_SPACE_FACILITY_facility_id FOREIGN KEY (facility_id) REFERENCES FACILITY(facility_id) ON DELETE CASCADE ON UPDATE NO ACTION` — pure current-state association row; delete cascades only for this junction; update is no action because PKs are immutable surrogates.
+- `CONSTRAINT FK_SPACE_FACILITY_space_id FOREIGN KEY (space_id) REFERENCES SPACE(space_id) ON DELETE CASCADE ON UPDATE NO ACTION` — pure dependent current-state association; deleting a space removes meaningless association rows; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_SPACE_FACILITY_facility_id FOREIGN KEY (facility_id) REFERENCES FACILITY(facility_id) ON DELETE CASCADE ON UPDATE NO ACTION` — pure dependent current-state association; deleting a facility removes meaningless association rows; update is `NO ACTION` because surrogate PKs are immutable.
 
 Uniqueness constraints:
-- `CONSTRAINT UQ_SPACE_FACILITY_space_id_facility_id UNIQUE (space_id, facility_id)` — prevents duplicate association rows while preserving surrogate PK standardization.
+- `CONSTRAINT UQ_SPACE_FACILITY_space_id_facility_id UNIQUE (space_id, facility_id)`
 
-### 2.5 `BOOKING_REQUEST`
+### 2.9 `BOOKING_STATUS`
 
-Logical table for conceptual `BOOKING_REQUEST`.
+Source entity: controlled booking lifecycle/status values. Also referenced by approval decision outcome per the upstream design directive.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `booking_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK; implements upstream proposed booking identifier | Conceptual `booking_id` proposed identifier |
-| `requester_user_account_id` | `INT` | `NOT NULL` | FK to `USER_ACCOUNT(user_account_id)` | Conceptual `SUBMITS`, BR-6 |
-| `space_id` | `INT` | `NOT NULL` | FK to `SPACE(space_id)` | Conceptual `SELECTS_SPACE`, BR-6 |
-| `requested_start_time` | `DATETIME2(0)` | `NOT NULL` | Start of requested period | Conceptual `requested_start_time`, BR-6 |
-| `requested_end_time` | `DATETIME2(0)` | `NOT NULL` | End of requested period; ordered by CHECK | Conceptual `requested_end_time`, BR-6 |
-| `purpose_of_use` | `NVARCHAR(40)` | `NOT NULL` | Closed process-category vocabulary | Conceptual `purpose_of_use`, BR-7 |
-| `expected_number_of_participants` | `INT` | `NOT NULL` | Positive count | Conceptual `expected_number_of_participants`, BR-6 |
-| `status` | `NVARCHAR(40)` | `NOT NULL` | Closed booking lifecycle vocabulary | Conceptual `status`, BR-8 |
+| `booking_status_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual BOOKING_STATUS identifier |
+| `status_name` | `NVARCHAR(80)` | NOT NULL | Controlled booking status name | BOOKING_STATUS.status_name, BR-08 |
 
 Primary key:
-- `CONSTRAINT PK_BOOKING_REQUEST PRIMARY KEY (booking_id)`
+- `CONSTRAINT PK_BOOKING_STATUS PRIMARY KEY (booking_status_id)`
+
+Uniqueness constraints:
+- `CONSTRAINT UQ_BOOKING_STATUS_status_name UNIQUE (status_name)`
+
+### 2.10 `BOOKING_REQUEST`
+
+Source entity: user's request to use a selected space for a requested period and purpose.
+
+| Column | Data Type | Nullability | Constraints / Notes | Source |
+|---|---:|---:|---|---|
+| `booking_request_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual BOOKING_REQUEST identifier |
+| `requester_user_account_id` | `INT` | NOT NULL | FK; `INT` matches `USER_ACCOUNT.user_account_id` | `SUBMITS`, BR-06 |
+| `space_id` | `INT` | NOT NULL | FK; `INT` matches `SPACE.space_id` | `SELECTS`, BR-06 |
+| `booking_status_id` | `INT` | NOT NULL | FK; `INT` matches `BOOKING_STATUS.booking_status_id` | `HAS_BOOKING_STATUS`, BR-08 |
+| `requested_start_time` | `DATETIME2(0)` | NOT NULL | Requested start | BOOKING_REQUEST.requested_start_time |
+| `requested_end_time` | `DATETIME2(0)` | NOT NULL | Requested end | BOOKING_REQUEST.requested_end_time |
+| `purpose_of_use` | `NVARCHAR(80)` | NOT NULL | Closed process category; CHECK-enforced | BOOKING_REQUEST.purpose_of_use, BR-07 |
+| `expected_number_of_participants` | `INT` | NOT NULL | Count of expected participants | BOOKING_REQUEST.expected_number_of_participants |
+
+Primary key:
+- `CONSTRAINT PK_BOOKING_REQUEST PRIMARY KEY (booking_request_id)`
 
 Foreign keys:
-- `CONSTRAINT FK_BOOKING_REQUEST_requester_user_account_id FOREIGN KEY (requester_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — preserves booking history rather than deleting when master user data is deleted; update is no action because PKs are immutable surrogates.
-- `CONSTRAINT FK_BOOKING_REQUEST_space_id FOREIGN KEY (space_id) REFERENCES SPACE(space_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — preserves booking history and prevents orphaned bookings if master space data is deleted; update is no action because PKs are immutable surrogates.
+- `CONSTRAINT FK_BOOKING_REQUEST_requester_user_account_id FOREIGN KEY (requester_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — historical booking FK; user deletion is restricted to preserve booking history; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_BOOKING_REQUEST_space_id FOREIGN KEY (space_id) REFERENCES SPACE(space_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — historical booking FK; space deletion is restricted to preserve booking history; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_BOOKING_REQUEST_booking_status_id FOREIGN KEY (booking_status_id) REFERENCES BOOKING_STATUS(booking_status_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — mandatory lookup FK; lookup deletion is restricted while bookings reference it; update is `NO ACTION` because surrogate PKs are immutable.
 
 CHECK constraints:
 - `CONSTRAINT CK_BOOKING_REQUEST_requested_time_order CHECK (requested_end_time > requested_start_time)`
 - `CONSTRAINT CK_BOOKING_REQUEST_expected_participants_positive CHECK (expected_number_of_participants > 0)`
-- `CONSTRAINT CK_BOOKING_REQUEST_purpose_of_use CHECK (purpose_of_use IN ('Lecture','Examination','Seminar','Workshop','Meeting','Student activity','Administrative event'))`
-- `CONSTRAINT CK_BOOKING_REQUEST_status CHECK (status IN ('Pending','Approved','Rejected','Cancelled','Checked in','Completed','No-show'))`
+- `CONSTRAINT CK_BOOKING_REQUEST_purpose_of_use CHECK (purpose_of_use IN (N'lecture', N'examination', N'seminar', N'workshop', N'meeting', N'student activity', N'administrative event'))`
 
 Unresolved / implementation rules:
-- BR-9 no overlapping approved bookings for the same space/time requires SQL Server implementation logic such as a trigger or transaction-controlled stored procedure because SQL Server ordinary CHECK constraints cannot compare against other rows.
-- BR-10/BR-19 no booking for under-maintenance, temporarily closed/closed, or retired spaces requires cross-table implementation logic because it depends on `SPACE.current_status` and/or maintenance activity.
-- Participant count versus `SPACE.capacity` is not enforced because upstream did not require the comparison; carried as an Open Question.
+- `BR-10` no overlapping approved bookings for the same space/time requires a SQL Server trigger, stored procedure, or serialized transaction rule.
+- `BR-11` unavailable-space booking prevention requires cross-table logic against `SPACE_STATUS` and booking status.
+- Participant count versus `SPACE.capacity` is not required by the source and remains an open question.
 
-### 2.6 `APPROVAL_DECISION`
+### 2.11 `APPROVAL_DECISION`
 
-Logical table for conceptual `APPROVAL_DECISION`.
+Source entity: approval/rejection decision event for a booking request.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `approval_decision_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK; implements upstream proposed identifier | Conceptual `approval_decision_id` |
-| `booking_id` | `INT` | `NOT NULL` | Non-unique FK to `BOOKING_REQUEST(booking_id)`; preserves 0..* decision history | Conceptual `HAS_APPROVAL_DECISION`, BR-11 to BR-13 |
-| `decision_maker_user_account_id` | `INT` | `NOT NULL` | FK to `USER_ACCOUNT(user_account_id)` | Conceptual `MADE_BY`, BR-12 |
-| `decision_outcome` | `NVARCHAR(20)` | `NOT NULL` | Closed decision outcome vocabulary | Conceptual `decision_outcome`, BR-12/BR-13 |
-| `decision_time` | `DATETIME2(0)` | `NOT NULL` | Decision event time | Conceptual `decision_time`, BR-12 |
-| `decision_note` | `NVARCHAR(1000)` | `NULL` | Optional note; source records it but does not state mandatory content | Conceptual `decision_note`, BR-12 |
-| `rejection_reason` | `NVARCHAR(1000)` | `NULL` | Required by CHECK only when rejected | Conceptual `rejection_reason`, BR-13 |
+| `approval_decision_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual APPROVAL_DECISION identifier |
+| `booking_request_id` | `INT` | NOT NULL | Plain non-unique FK; `INT` matches `BOOKING_REQUEST.booking_request_id` | `HAS_APPROVAL_DECISION` |
+| `decided_by_user_account_id` | `INT` | NOT NULL | FK; `INT` matches `USER_ACCOUNT.user_account_id` | `MAKES_DECISION`, BR-13 |
+| `decision_outcome_booking_status_id` | `INT` | NOT NULL | FK to shared booking-status lookup; only approved/rejected meaningful by assumption | `HAS_DECISION_OUTCOME`, BR-13 |
+| `decision_time` | `DATETIME2(0)` | NOT NULL | Decision timestamp | APPROVAL_DECISION.decision_time |
+| `decision_note` | `NVARCHAR(1000)` | NULL | Optional note; source says note is recorded but not that it is mandatory content | APPROVAL_DECISION.decision_note |
+| `rejection_reason` | `NVARCHAR(1000)` | NULL | Required when outcome is rejected; full enforcement needs seed-aware logic | APPROVAL_DECISION.rejection_reason, BR-14 |
 
 Primary key:
 - `CONSTRAINT PK_APPROVAL_DECISION PRIMARY KEY (approval_decision_id)`
 
 Foreign keys:
-- `CONSTRAINT FK_APPROVAL_DECISION_booking_id FOREIGN KEY (booking_id) REFERENCES BOOKING_REQUEST(booking_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — approval decisions are historical/audit records; no delete cascade; update is no action because PKs are immutable surrogates.
-- `CONSTRAINT FK_APPROVAL_DECISION_decision_maker_user_account_id FOREIGN KEY (decision_maker_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — preserves who made the decision; update is no action because PKs are immutable surrogates.
+- `CONSTRAINT FK_APPROVAL_DECISION_booking_request_id FOREIGN KEY (booking_request_id) REFERENCES BOOKING_REQUEST(booking_request_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — historical decision FK; booking deletion is restricted to preserve decision history; update is `NO ACTION` because surrogate PKs are immutable. This FK is deliberately **not UNIQUE** because conceptual cardinality is `BOOKING_REQUEST 0..* — APPROVAL_DECISION 1..1`.
+- `CONSTRAINT FK_APPROVAL_DECISION_decided_by_user_account_id FOREIGN KEY (decided_by_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — audit actor FK; user deletion is restricted to preserve who made the decision; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_APPROVAL_DECISION_decision_outcome_booking_status_id FOREIGN KEY (decision_outcome_booking_status_id) REFERENCES BOOKING_STATUS(booking_status_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — shared lookup FK for decision outcome; lookup deletion is restricted while decisions reference it; update is `NO ACTION` because surrogate PKs are immutable.
 
 CHECK constraints:
-- `CONSTRAINT CK_APPROVAL_DECISION_decision_outcome CHECK (decision_outcome IN ('Approved','Rejected'))`
-- `CONSTRAINT CK_APPROVAL_DECISION_rejection_reason CHECK (decision_outcome <> 'Rejected' OR rejection_reason IS NOT NULL)`
+- `CONSTRAINT CK_APPROVAL_DECISION_rejection_reason CHECK (decision_outcome_booking_status_id <> <BOOKING_STATUS_ID_FOR_REJECTED> OR (rejection_reason IS NOT NULL AND LEN(LTRIM(RTRIM(rejection_reason))) > 0))`
 
 Unresolved / implementation rules:
-- Role restriction that the decision maker must be facility staff or facility manager requires SQL Server implementation logic (trigger/procedure) because it checks `USER_ACCOUNT.role` across tables.
-- No unique constraint on `booking_id`; conceptual cardinality is Booking Request `1` to Approval Decision `0..*`.
+- `BR-14` rejected approvals must store a rejection reason. The named logical CHECK above expresses the required in-row condition, but the placeholder `<BOOKING_STATUS_ID_FOR_REJECTED>` must be resolved during implementation after lookup seed values are fixed, or replaced by an equivalent trigger / persisted-code pattern.
+- Decision-maker role restriction to facility staff or facility manager requires implementation logic joining through `USER_ACCOUNT.role_id` and `ROLE.role_name`.
+- Only `approved` and `rejected` booking status rows are meaningful as decision outcomes; restricting the FK domain to those two lookup rows is deferred until seed IDs or a status-code pattern is defined.
 
-### 2.7 `USAGE_SESSION`
+### 2.12 `USAGE_SESSION`
 
-Logical table for conceptual `USAGE_SESSION`.
+Source entity: actual checked-in/completed use of a booking.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `usage_session_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK; implements upstream proposed identifier | Conceptual `usage_session_id` |
-| `booking_id` | `INT` | `NOT NULL` | FK to `BOOKING_REQUEST(booking_id)`; unique because a booking has 0..1 usage session | Conceptual `HAS_USAGE_SESSION`, BR-14 to BR-16 |
-| `checked_in_by_user_account_id` | `INT` | `NOT NULL` | FK to `USER_ACCOUNT(user_account_id)` | Conceptual `CHECKED_IN_BY`, BR-15 |
-| `completed_by_user_account_id` | `INT` | `NULL` | Optional role FK to `USER_ACCOUNT(user_account_id)` | Conceptual `COMPLETED_BY`, BR-16 |
-| `actual_start_time` | `DATETIME2(0)` | `NOT NULL` | Check-in actual start time | Conceptual `actual_start_time`, BR-15 |
-| `initial_condition_of_space` | `NVARCHAR(1000)` | `NOT NULL` | Recorded at check-in | Conceptual `initial_condition_of_space`, BR-15 |
-| `actual_end_time` | `DATETIME2(0)` | `NULL` | Completion-dependent | Conceptual `actual_end_time`, BR-16 |
-| `final_condition_of_space` | `NVARCHAR(1000)` | `NULL` | Completion-dependent | Conceptual `final_condition_of_space`, BR-16 |
-| `usage_notes` | `NVARCHAR(1000)` | `NULL` | Optional usage notes | Conceptual `usage_notes`, BR-16 |
+| `usage_session_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual USAGE_SESSION identifier |
+| `booking_request_id` | `INT` | NOT NULL | FK and unique; `INT` matches `BOOKING_REQUEST.booking_request_id` | `HAS_USAGE_SESSION` |
+| `checked_in_by_user_account_id` | `INT` | NOT NULL | FK; `INT` matches `USER_ACCOUNT.user_account_id` | `CHECKS_IN`, BR-15 |
+| `completed_by_user_account_id` | `INT` | NULL | Optional FK; `INT` matches `USER_ACCOUNT.user_account_id` | `COMPLETES`, BR-16 |
+| `actual_start_time` | `DATETIME2(0)` | NOT NULL | Actual start recorded at check-in | USAGE_SESSION.actual_start_time |
+| `initial_condition_of_space` | `NVARCHAR(1000)` | NOT NULL | Initial condition recorded at check-in | USAGE_SESSION.initial_condition_of_space |
+| `actual_end_time` | `DATETIME2(0)` | NULL | Lifecycle-dependent; only present after completion | USAGE_SESSION.actual_end_time |
+| `final_condition_of_space` | `NVARCHAR(1000)` | NULL | Lifecycle-dependent; only present after completion | USAGE_SESSION.final_condition_of_space |
+| `usage_notes` | `NVARCHAR(1000)` | NULL | Optional usage notes | USAGE_SESSION.usage_notes |
 
 Primary key:
 - `CONSTRAINT PK_USAGE_SESSION PRIMARY KEY (usage_session_id)`
 
 Foreign keys:
-- `CONSTRAINT FK_USAGE_SESSION_booking_id FOREIGN KEY (booking_id) REFERENCES BOOKING_REQUEST(booking_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — preserves usage history tied to historical booking; update is no action because PKs are immutable surrogates.
-- `CONSTRAINT FK_USAGE_SESSION_checked_in_by_user_account_id FOREIGN KEY (checked_in_by_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — preserves check-in actor; update is no action because PKs are immutable surrogates.
-- `CONSTRAINT FK_USAGE_SESSION_completed_by_user_account_id FOREIGN KEY (completed_by_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — optional actor FK is not SET NULL because preserving who completed the session supports history; update is no action because PKs are immutable surrogates.
+- `CONSTRAINT FK_USAGE_SESSION_booking_request_id FOREIGN KEY (booking_request_id) REFERENCES BOOKING_REQUEST(booking_request_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — historical usage FK; booking deletion is restricted to preserve usage history; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_USAGE_SESSION_checked_in_by_user_account_id FOREIGN KEY (checked_in_by_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — audit actor FK; deletion is restricted to preserve who checked in; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_USAGE_SESSION_completed_by_user_account_id FOREIGN KEY (completed_by_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — optional audit actor FK; `SET NULL` rejected because preserving who completed is valuable; update is `NO ACTION` because surrogate PKs are immutable.
 
 Uniqueness constraints:
-- `CONSTRAINT UQ_USAGE_SESSION_booking_id UNIQUE (booking_id)`
+- `CONSTRAINT UQ_USAGE_SESSION_booking_request_id UNIQUE (booking_request_id)`
 
 CHECK constraints:
 - `CONSTRAINT CK_USAGE_SESSION_actual_time_order CHECK (actual_end_time IS NULL OR actual_end_time > actual_start_time)`
-- `CONSTRAINT CK_USAGE_SESSION_completion_fields CHECK ((actual_end_time IS NULL AND completed_by_user_account_id IS NULL AND final_condition_of_space IS NULL) OR (actual_end_time IS NOT NULL AND completed_by_user_account_id IS NOT NULL AND final_condition_of_space IS NOT NULL))`
 
 Unresolved / implementation rules:
-- Role restrictions for check-in and completion requiring facility staff require SQL Server implementation logic because they check `USER_ACCOUNT.role` across tables.
+- Check-in and completion role restrictions to facility staff require implementation logic joining `USER_ACCOUNT` to `ROLE`.
 
-### 2.8 `MAINTENANCE_RECORD`
+### 2.13 `MAINTENANCE_STATUS`
 
-Logical table for conceptual `MAINTENANCE_RECORD`.
+Source entity: maintenance status lookup. Upstream does not specify allowed values.
 
 | Column | Data Type | Nullability | Constraints / Notes | Source |
 |---|---:|---:|---|---|
-| `maintenance_record_id` | `INT IDENTITY(1,1)` | `NOT NULL` | Surrogate PK; implements upstream proposed identifier | Conceptual `maintenance_record_id` |
-| `space_id` | `INT` | `NOT NULL` | FK to `SPACE(space_id)` | Conceptual `HAS_MAINTENANCE_RECORD`, BR-17/BR-18 |
-| `reporter_user_account_id` | `INT` | `NOT NULL` | FK to `USER_ACCOUNT(user_account_id)` | Conceptual `REPORTED_BY`, BR-18 |
-| `assigned_staff_user_account_id` | `INT` | `NULL` | Optional role FK to `USER_ACCOUNT(user_account_id)` | Conceptual `ASSIGNED_TO`; assignment timing unresolved |
-| `problem_description` | `NVARCHAR(1000)` | `NOT NULL` | Stored problem detail | Conceptual `problem_description`, BR-17/BR-18 |
-| `start_time` | `DATETIME2(0)` | `NOT NULL` | Maintenance start time | Conceptual `start_time`, BR-18 |
-| `completion_time` | `DATETIME2(0)` | `NULL` | Completion-dependent | Conceptual `completion_time`, BR-18 |
-| `status` | `NVARCHAR(40)` | `NOT NULL` | Stored status; no upstream values available for CHECK | Conceptual `status`, BR-18 |
-| `result_note` | `NVARCHAR(1000)` | `NULL` | Completion/result-dependent note | Conceptual `result_note`, BR-18 |
+| `maintenance_status_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual MAINTENANCE_STATUS identifier |
+| `status_name` | `NVARCHAR(80)` | NOT NULL | Controlled maintenance status name; actual values unresolved | MAINTENANCE_STATUS.status_name |
+
+Primary key:
+- `CONSTRAINT PK_MAINTENANCE_STATUS PRIMARY KEY (maintenance_status_id)`
+
+Uniqueness constraints:
+- `CONSTRAINT UQ_MAINTENANCE_STATUS_status_name UNIQUE (status_name)`
+
+### 2.14 `MAINTENANCE_RECORD`
+
+Source entity: maintenance record for a space problem.
+
+| Column | Data Type | Nullability | Constraints / Notes | Source |
+|---|---:|---:|---|---|
+| `maintenance_record_id` | `INT IDENTITY(1,1)` | NOT NULL | Surrogate PK | Conceptual MAINTENANCE_RECORD identifier |
+| `space_id` | `INT` | NOT NULL | FK; `INT` matches `SPACE.space_id` | `HAS_MAINTENANCE_RECORD`, BR-18 |
+| `reported_by_user_account_id` | `INT` | NOT NULL | FK; `INT` matches `USER_ACCOUNT.user_account_id` | `REPORTS`, BR-18 |
+| `assigned_to_user_account_id` | `INT` | NULL | Optional FK; `INT` matches `USER_ACCOUNT.user_account_id` | `ASSIGNED_TO`, upstream timing assumption |
+| `maintenance_status_id` | `INT` | NOT NULL | FK; `INT` matches `MAINTENANCE_STATUS.maintenance_status_id` | `HAS_MAINTENANCE_STATUS`, BR-18 |
+| `problem_description` | `NVARCHAR(1000)` | NOT NULL | Stored problem description | MAINTENANCE_RECORD.problem_description |
+| `start_time` | `DATETIME2(0)` | NOT NULL | Maintenance start time | MAINTENANCE_RECORD.start_time |
+| `completion_time` | `DATETIME2(0)` | NULL | Lifecycle-dependent; absent before completion | MAINTENANCE_RECORD.completion_time |
+| `result_note` | `NVARCHAR(1000)` | NULL | Result note may be absent before completion | MAINTENANCE_RECORD.result_note |
 
 Primary key:
 - `CONSTRAINT PK_MAINTENANCE_RECORD PRIMARY KEY (maintenance_record_id)`
 
 Foreign keys:
-- `CONSTRAINT FK_MAINTENANCE_RECORD_space_id FOREIGN KEY (space_id) REFERENCES SPACE(space_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — preserves maintenance history for a space; update is no action because PKs are immutable surrogates.
-- `CONSTRAINT FK_MAINTENANCE_RECORD_reporter_user_account_id FOREIGN KEY (reporter_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — preserves reporter history; update is no action because PKs are immutable surrogates.
-- `CONSTRAINT FK_MAINTENANCE_RECORD_assigned_staff_user_account_id FOREIGN KEY (assigned_staff_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — optional actor FK is not SET NULL because preserving assignment history is valuable; update is no action because PKs are immutable surrogates.
+- `CONSTRAINT FK_MAINTENANCE_RECORD_space_id FOREIGN KEY (space_id) REFERENCES SPACE(space_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — historical maintenance FK; space deletion is restricted to preserve maintenance history; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_MAINTENANCE_RECORD_reported_by_user_account_id FOREIGN KEY (reported_by_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — audit actor FK; user deletion is restricted to preserve reporter history; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_MAINTENANCE_RECORD_assigned_to_user_account_id FOREIGN KEY (assigned_to_user_account_id) REFERENCES USER_ACCOUNT(user_account_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — optional audit actor FK; `SET NULL` rejected because preserving assigned staff is valuable; update is `NO ACTION` because surrogate PKs are immutable.
+- `CONSTRAINT FK_MAINTENANCE_RECORD_maintenance_status_id FOREIGN KEY (maintenance_status_id) REFERENCES MAINTENANCE_STATUS(maintenance_status_id) ON DELETE NO ACTION ON UPDATE NO ACTION` — mandatory lookup FK; lookup deletion is restricted while maintenance records reference it; update is `NO ACTION` because surrogate PKs are immutable.
 
 CHECK constraints:
 - `CONSTRAINT CK_MAINTENANCE_RECORD_time_order CHECK (completion_time IS NULL OR completion_time > start_time)`
 
 Unresolved / implementation rules:
-- No CHECK on `status`: no upstream maintenance-status value list is available.
-- Role eligibility for reporter and assigned staff is unresolved/implementation logic.
-- Active-maintenance effect on `SPACE.current_status` and availability is unresolved/cross-table implementation logic.
+- Maintenance status values and transitions are unresolved upstream.
+- Whether maintenance records automatically set `SPACE` to under maintenance is unresolved upstream.
+- Reporter eligibility and assignment workflow require authorization/workflow clarification.
 
 ## 3. Relationship Mapping
 
 | Conceptual Relationship | Cardinality / Participation | Logical Mapping |
 |---|---|---|
-| `SUBMITS` | User `1..1` to Booking Request `0..*`; each booking has one requester | `BOOKING_REQUEST.requester_user_account_id INT NOT NULL` FK to `USER_ACCOUNT(user_account_id)`; no UNIQUE. |
-| `SELECTS_SPACE` | Booking Request `0..*` to Space `1..1`; each booking selects one space | `BOOKING_REQUEST.space_id INT NOT NULL` FK to `SPACE(space_id)`; no UNIQUE. |
-| `HAS_FACILITY` | Space `0..*` to Facility `0..*` | Junction `SPACE_FACILITY` with `space_id` and `facility_id` FKs plus `UQ_SPACE_FACILITY_space_id_facility_id`. |
-| `HAS_APPROVAL_DECISION` | Booking Request `1..1` to Approval Decision `0..*` | `APPROVAL_DECISION.booking_id INT NOT NULL` FK to `BOOKING_REQUEST(booking_id)`; no UNIQUE to preserve decision history. |
-| `MADE_BY` | User `1..1` to Approval Decision `0..*` | `APPROVAL_DECISION.decision_maker_user_account_id INT NOT NULL` FK to `USER_ACCOUNT(user_account_id)`. |
-| `HAS_USAGE_SESSION` | Booking Request `1..1` to Usage Session `0..1` | `USAGE_SESSION.booking_id INT NOT NULL` FK to `BOOKING_REQUEST(booking_id)` with `UQ_USAGE_SESSION_booking_id`. |
-| `CHECKED_IN_BY` | User `1..1` to Usage Session `0..*`; each session has one check-in actor | `USAGE_SESSION.checked_in_by_user_account_id INT NOT NULL` FK to `USER_ACCOUNT(user_account_id)`. |
-| `COMPLETED_BY` | User `0..1` to Usage Session `0..*`; completion actor optional per session | `USAGE_SESSION.completed_by_user_account_id INT NULL` FK to `USER_ACCOUNT(user_account_id)`. |
-| `HAS_MAINTENANCE_RECORD` | Space `1..1` to Maintenance Record `0..*` | `MAINTENANCE_RECORD.space_id INT NOT NULL` FK to `SPACE(space_id)`. |
-| `REPORTED_BY` | User `1..1` to Maintenance Record `0..*`; each record has one reporter | `MAINTENANCE_RECORD.reporter_user_account_id INT NOT NULL` FK to `USER_ACCOUNT(user_account_id)`. |
-| `ASSIGNED_TO` | User `0..1` to Maintenance Record `0..*`; assignment optional per record | `MAINTENANCE_RECORD.assigned_staff_user_account_id INT NULL` FK to `USER_ACCOUNT(user_account_id)`. |
+| `BELONGS_TO` | USER_ACCOUNT `1..1` — DEPARTMENT `0..*` | `USER_ACCOUNT.department_id INT NOT NULL` → `DEPARTMENT.department_id`; `FK_USER_ACCOUNT_department_id`; no UNIQUE. |
+| `IS_MANAGED_BY` | DEPARTMENT `0..1` — USER_ACCOUNT `0..*` | `DEPARTMENT.head_user_account_id INT NULL` → `USER_ACCOUNT.user_account_id`; `FK_DEPARTMENT_head_user_account_id`; no UNIQUE because one user may manage many departments. |
+| `HAS_ROLE` | USER_ACCOUNT `1..1` — ROLE `0..*` | `USER_ACCOUNT.role_id INT NOT NULL` → `ROLE.role_id`; `FK_USER_ACCOUNT_role_id`. |
+| `HAS_ACCOUNT_STATUS` | USER_ACCOUNT `1..1` — ACCOUNT_STATUS `0..*` | `USER_ACCOUNT.account_status_id INT NOT NULL` → `ACCOUNT_STATUS.account_status_id`; `FK_USER_ACCOUNT_account_status_id`. |
+| `HAS_SPACE_STATUS` | SPACE `1..1` — SPACE_STATUS `0..*` | `SPACE.space_status_id INT NOT NULL` → `SPACE_STATUS.space_status_id`; `FK_SPACE_space_status_id`. |
+| `HAS_BOOKING_STATUS` | BOOKING_REQUEST `1..1` — BOOKING_STATUS `0..*` | `BOOKING_REQUEST.booking_status_id INT NOT NULL` → `BOOKING_STATUS.booking_status_id`; `FK_BOOKING_REQUEST_booking_status_id`. |
+| `HAS_DECISION_OUTCOME` | APPROVAL_DECISION `1..1` — BOOKING_STATUS `0..*` | `APPROVAL_DECISION.decision_outcome_booking_status_id INT NOT NULL` → `BOOKING_STATUS.booking_status_id`; `FK_APPROVAL_DECISION_decision_outcome_booking_status_id`. |
+| `HAS_MAINTENANCE_STATUS` | MAINTENANCE_RECORD `1..1` — MAINTENANCE_STATUS `0..*` | `MAINTENANCE_RECORD.maintenance_status_id INT NOT NULL` → `MAINTENANCE_STATUS.maintenance_status_id`; `FK_MAINTENANCE_RECORD_maintenance_status_id`. |
+| `HAS_FACILITY` (`SPACE` side) | SPACE `0..*` — FACILITY `0..*` | `SPACE_FACILITY.space_id INT NOT NULL` → `SPACE.space_id`; `FK_SPACE_FACILITY_space_id`; part of `UQ_SPACE_FACILITY_space_id_facility_id`. |
+| `HAS_FACILITY` (`FACILITY` side) | SPACE `0..*` — FACILITY `0..*` | `SPACE_FACILITY.facility_id INT NOT NULL` → `FACILITY.facility_id`; `FK_SPACE_FACILITY_facility_id`; part of `UQ_SPACE_FACILITY_space_id_facility_id`. |
+| `SUBMITS` | USER_ACCOUNT `0..*` — BOOKING_REQUEST `1..1` | `BOOKING_REQUEST.requester_user_account_id INT NOT NULL` → `USER_ACCOUNT.user_account_id`; `FK_BOOKING_REQUEST_requester_user_account_id`. |
+| `SELECTS` | BOOKING_REQUEST `1..1` — SPACE `0..*` | `BOOKING_REQUEST.space_id INT NOT NULL` → `SPACE.space_id`; `FK_BOOKING_REQUEST_space_id`. |
+| `HAS_APPROVAL_DECISION` | BOOKING_REQUEST `0..*` — APPROVAL_DECISION `1..1` | `APPROVAL_DECISION.booking_request_id INT NOT NULL` → `BOOKING_REQUEST.booking_request_id`; `FK_APPROVAL_DECISION_booking_request_id`; deliberately non-unique to preserve decision history. |
+| `MAKES_DECISION` | USER_ACCOUNT `0..*` — APPROVAL_DECISION `1..1` | `APPROVAL_DECISION.decided_by_user_account_id INT NOT NULL` → `USER_ACCOUNT.user_account_id`; `FK_APPROVAL_DECISION_decided_by_user_account_id`. |
+| `HAS_USAGE_SESSION` | BOOKING_REQUEST `0..1` — USAGE_SESSION `1..1` | `USAGE_SESSION.booking_request_id INT NOT NULL` → `BOOKING_REQUEST.booking_request_id`; `FK_USAGE_SESSION_booking_request_id`; `UQ_USAGE_SESSION_booking_request_id` enforces at most one session per booking. |
+| `CHECKS_IN` | USER_ACCOUNT `0..*` — USAGE_SESSION `1..1` | `USAGE_SESSION.checked_in_by_user_account_id INT NOT NULL` → `USER_ACCOUNT.user_account_id`; `FK_USAGE_SESSION_checked_in_by_user_account_id`. |
+| `COMPLETES` | USER_ACCOUNT `0..*` — USAGE_SESSION `0..1` | `USAGE_SESSION.completed_by_user_account_id INT NULL` → `USER_ACCOUNT.user_account_id`; `FK_USAGE_SESSION_completed_by_user_account_id`. |
+| `HAS_MAINTENANCE_RECORD` | SPACE `0..*` — MAINTENANCE_RECORD `1..1` | `MAINTENANCE_RECORD.space_id INT NOT NULL` → `SPACE.space_id`; `FK_MAINTENANCE_RECORD_space_id`. |
+| `REPORTS` | USER_ACCOUNT `0..*` — MAINTENANCE_RECORD `1..1` | `MAINTENANCE_RECORD.reported_by_user_account_id INT NOT NULL` → `USER_ACCOUNT.user_account_id`; `FK_MAINTENANCE_RECORD_reported_by_user_account_id`. |
+| `ASSIGNED_TO` | USER_ACCOUNT `0..*` — MAINTENANCE_RECORD `0..1` | `MAINTENANCE_RECORD.assigned_to_user_account_id INT NULL` → `USER_ACCOUNT.user_account_id`; `FK_MAINTENANCE_RECORD_assigned_to_user_account_id`. |
 
 ## 4. Traceability from Requirements to Tables and Constraints
 
-Upstream business requirement analysis defines BR-1 through BR-21; no BR-22 is present in the Step 1 document.
-
 | Requirement / Rule | Logical Tables / Columns | Logical Treatment |
 |---|---|---|
-| BR-1: User account and stored user information | `USER_ACCOUNT` columns | Enforced by table structure, `PK_USER_ACCOUNT`, `UQ_USER_ACCOUNT_user_id`, `UQ_USER_ACCOUNT_email`; account status values unresolved. |
-| BR-2: User role values | `USER_ACCOUNT.role` | Enforced by `CK_USER_ACCOUNT_role`. |
-| BR-3: Stored space details | `SPACE` columns | Enforced by table structure, `PK_SPACE`, `UQ_SPACE_unique_space_code`, `CK_SPACE_capacity_positive`. |
-| BR-4: Space current status values | `SPACE.current_status` | Enforced by `CK_SPACE_current_status`. |
-| BR-5: Facilities available in each space | `FACILITY`, `SPACE_FACILITY` | Enforced by FKs and `UQ_SPACE_FACILITY_space_id_facility_id`. |
-| BR-6: Submit booking by selecting space, times, purpose, participants | `BOOKING_REQUEST` columns and FKs | Enforced by `FK_BOOKING_REQUEST_requester_user_account_id`, `FK_BOOKING_REQUEST_space_id`, `CK_BOOKING_REQUEST_requested_time_order`, `CK_BOOKING_REQUEST_expected_participants_positive`. |
-| BR-7: Booking purpose values | `BOOKING_REQUEST.purpose_of_use` | Enforced by `CK_BOOKING_REQUEST_purpose_of_use`. |
-| BR-8: Booking status values | `BOOKING_REQUEST.status` | Enforced by `CK_BOOKING_REQUEST_status`; lifecycle transitions for Cancelled/No-show remain open. |
-| BR-9: No overlapping approved bookings for same space/time | `BOOKING_REQUEST.space_id`, `requested_start_time`, `requested_end_time`, `status` | Requires SQL Server implementation logic such as trigger/stored procedure/transaction rule; ordinary CHECK cannot compare rows. |
-| BR-10: Under-maintenance, closed, retired spaces cannot be booked | `BOOKING_REQUEST.space_id`, `SPACE.current_status` | Requires cross-table implementation logic; `SPACE.current_status` CHECK supplies controlled values. |
-| BR-11: Booking may require approval from facility staff/manager | `APPROVAL_DECISION`, `USER_ACCOUNT.role` | FKs capture decision-maker; role restriction requires implementation logic. |
-| BR-12: Record decision maker, time, note | `APPROVAL_DECISION` columns and FKs | Enforced by `FK_APPROVAL_DECISION_decision_maker_user_account_id`; decision note nullable due source-strength rule. |
-| BR-13: Rejected approval stores rejection reason | `APPROVAL_DECISION.decision_outcome`, `rejection_reason` | Enforced by `CK_APPROVAL_DECISION_rejection_reason`. |
-| BR-14: Facility staff can check in booking | `USAGE_SESSION`, `checked_in_by_user_account_id` | FK captures actor; role restriction requires implementation logic. |
-| BR-15: Check-in actual start/person/initial condition | `USAGE_SESSION` columns | Enforced by `FK_USAGE_SESSION_checked_in_by_user_account_id`; required fields are NOT NULL. |
-| BR-16: Complete booking with actual end/final condition/notes | `USAGE_SESSION` columns | Completion fields are nullable until completion; `CK_USAGE_SESSION_actual_time_order` and `CK_USAGE_SESSION_completion_fields` enforce in-row consistency. |
-| BR-17: Space maintenance records for problems | `MAINTENANCE_RECORD`, `SPACE` | Enforced by `FK_MAINTENANCE_RECORD_space_id`. |
-| BR-18: Maintenance record details | `MAINTENANCE_RECORD` columns and FKs | FKs capture related space, reporter, assigned staff; `CK_MAINTENANCE_RECORD_time_order` enforces chronological order; status values unresolved. |
-| BR-19: Space under maintenance cannot be booked | `SPACE.current_status`, `MAINTENANCE_RECORD.status`, `BOOKING_REQUEST` | Requires cross-table implementation logic; active-maintenance synchronization is unresolved. |
-| BR-20: Keep historical records | `BOOKING_REQUEST`, `APPROVAL_DECISION`, `USAGE_SESSION`, `MAINTENANCE_RECORD` | Enforced by separate history tables and `ON DELETE NO ACTION` on historical/master references. |
-| BR-21: Staff view history/upcoming/maintenance/no-show | Relevant tables and status columns | Data is available for queries; authorization/view logic deferred. |
-
-Mandatory business-rule classification:
-- No overlapping approved bookings for the same space/time: requires SQL Server implementation logic (trigger, stored procedure, or serializable transaction/application-controlled transaction).
-- No booking for spaces under maintenance, temporarily closed, or retired: requires cross-table SQL Server implementation logic using `SPACE.current_status` and possibly `MAINTENANCE_RECORD`; ordinary FK/CHECK cannot enforce it.
-- Approval decision maker role restriction: requires SQL Server implementation logic checking `USER_ACCOUNT.role IN ('Facility Staff','Facility Manager')`.
-- Check-in and completion role restrictions: require SQL Server implementation logic checking `USER_ACCOUNT.role = 'Facility Staff'` for check-in/completion actors.
-- Rejected approval must store rejection reason: enforced by named CHECK `CK_APPROVAL_DECISION_rejection_reason`.
-- Maintenance status handling and active-maintenance effect on availability: unresolved Open Question; any synchronization requires implementation logic after status vocabulary is clarified.
-- Participant count versus space capacity: unresolved Open Question; no upstream requirement says expected participants must be `<= SPACE.capacity`.
+| BR-01: User account and basic information are stored. | `USER_ACCOUNT`, `DEPARTMENT`, `ROLE`, `ACCOUNT_STATUS` | Attributes stored as columns; role/department/status enforced by FKs; `user_id` and `email` enforced by UNIQUE. |
+| BR-02: User roles include student, lecturer, teaching assistant, facility staff, department administrator, facility manager. | `ROLE.role_name`, `USER_ACCOUNT.role_id` | Closed authorization vocabulary enforced by lookup FK; seed values inserted later. |
+| BR-03: Space details are stored. | `SPACE` columns | Attributes stored; `unique_space_code` enforced by UNIQUE; `capacity > 0` CHECK. |
+| BR-04: Space statuses include available, in use, under maintenance, temporarily closed, retired. | `SPACE_STATUS.status_name`, `SPACE.space_status_id` | Closed lifecycle vocabulary enforced by lookup FK; seed values inserted later. |
+| BR-05: Spaces may have facilities. | `FACILITY`, `SPACE_FACILITY` | M:N resolved by junction table with FK pair and `UQ_SPACE_FACILITY_space_id_facility_id`. |
+| BR-06: Users submit booking requests by selecting space, times, purpose, expected participants. | `BOOKING_REQUEST` FKs and columns | Submission and selected space enforced by FKs; requested time order and participant positivity by CHECK. |
+| BR-07: Booking purposes are listed. | `BOOKING_REQUEST.purpose_of_use` | Closed process-category values enforced by `CK_BOOKING_REQUEST_purpose_of_use`. |
+| BR-08: Each booking has a status. | `BOOKING_STATUS`, `BOOKING_REQUEST.booking_status_id` | Closed lifecycle vocabulary enforced by FK. |
+| BR-09 / BR-10: No conflicting approved bookings; same space cannot have approved overlapping bookings. | `BOOKING_REQUEST.space_id`, `booking_status_id`, requested times | Requires SQL Server implementation logic: trigger, stored procedure, or serialized transaction rule; ordinary CHECK cannot compare rows. |
+| BR-11: Under-maintenance, temporarily closed, or retired spaces cannot be booked. | `SPACE.space_status_id`, `BOOKING_REQUEST.space_id` | Requires cross-table implementation logic at booking insert/status approval time. |
+| BR-12: Booking may require approval. | `APPROVAL_DECISION.booking_request_id` | Optional 0..* decision history supported by non-unique FK. Approval criteria are an open question. |
+| BR-13: Decision maker, time, note, and approved/rejected outcome are recorded. | `APPROVAL_DECISION`, `BOOKING_STATUS`, `USER_ACCOUNT` | FKs record booking, decision maker, outcome; `decision_time` stored; role restriction requires implementation logic. |
+| BR-14: Rejected approval stores rejection reason. | `APPROVAL_DECISION.rejection_reason`, `decision_outcome_booking_status_id` | Nonblank reason CHECK for supplied reasons; full rejected⇒reason rule requires seed-aware trigger or code-based implementation due lookup FK outcome. |
+| BR-15: Check-in details are recorded. | `USAGE_SESSION.actual_start_time`, `initial_condition_of_space`, `checked_in_by_user_account_id` | Stored columns and mandatory check-in actor FK; role restriction requires implementation logic. |
+| BR-16: Completion details are recorded. | `USAGE_SESSION.actual_end_time`, `final_condition_of_space`, `usage_notes`, `completed_by_user_account_id` | Lifecycle nullable completion columns; time order enforced by CHECK; role restriction requires implementation logic. |
+| BR-17: Space may have maintenance records. | `MAINTENANCE_RECORD.space_id` | Enforced by FK from maintenance record to space. |
+| BR-18: Maintenance record details are stored. | `MAINTENANCE_RECORD` columns and FKs | Related space, reporter, assigned staff, status, problem, start/completion, result note represented; completion order CHECK. |
+| BR-19: Space under maintenance cannot be booked. | `SPACE_STATUS`, `SPACE`, `BOOKING_REQUEST`, `MAINTENANCE_RECORD` | Requires cross-table implementation logic; active-maintenance/status synchronization is open. |
+| BR-20: Historical booking and maintenance records are kept. | Historical tables and FK `ON DELETE NO ACTION` | Historical rows preserved by restrictive referential actions. |
+| BR-21: Staff can view history/upcoming/maintenance/no-show lists. | `BOOKING_REQUEST`, `BOOKING_STATUS`, `SPACE`, `MAINTENANCE_RECORD`, `ROLE` | Data supports queries; authorization mapping of generic “Staff” remains an open question. |
+| No overlapping approved bookings for same space/time. | `BOOKING_REQUEST` | Requires SQL Server implementation logic (trigger/procedure/transaction); not enforceable by ordinary row CHECK. |
+| No booking for unavailable spaces. | `SPACE`, `SPACE_STATUS`, `BOOKING_REQUEST` | Requires SQL Server implementation logic because it is cross-table and lifecycle-dependent. |
+| Approval decision maker role restriction. | `APPROVAL_DECISION.decided_by_user_account_id`, `USER_ACCOUNT.role_id`, `ROLE.role_name` | Requires implementation logic to allow facility staff/facility manager only. |
+| Check-in and completion role restrictions. | `USAGE_SESSION` actor FKs, `USER_ACCOUNT`, `ROLE` | Requires implementation logic to allow facility staff only. |
+| Rejected approval must store rejection reason. | `APPROVAL_DECISION` | Requires seed-aware implementation logic; named nonblank CHECK included for supplied reason text. |
+| Maintenance status handling and active-maintenance effect. | `MAINTENANCE_STATUS`, `MAINTENANCE_RECORD`, `SPACE_STATUS` | Open question; no unsupported synchronization rule asserted. |
+| Participant count versus space capacity. | `BOOKING_REQUEST.expected_number_of_participants`, `SPACE.capacity` | Open question; not enforced because upstream did not require the comparison. |
 
 ## 5. Assumptions Carried Forward
 
-- [upstream] Facility ID, Booking ID, Approval Decision ID, Usage Session ID, and Maintenance Record ID were proposed upstream because the source did not state identifiers. At logical stage these proposed identifiers are implemented as surrogate `INT IDENTITY` primary keys rather than duplicated as unsupported natural-key columns.
-- [upstream] Decision outcome is included on `APPROVAL_DECISION` as a derived attribute because the source names approved/rejected outcomes.
-- [upstream] `HAS_USAGE_SESSION` remains `1 to 0..1`; `USAGE_SESSION.booking_id` is therefore unique.
-- [upstream] “Closed” in the booking restriction is treated as `SPACE.current_status = 'Temporarily closed'` for allowed-value naming.
-- [upstream] Generic “staff” viewing permissions are not split into separate roles because the source does not identify which staff-related roles are included.
-- [upstream] No separate booking type/category is introduced; `purpose_of_use` is the source-named fact.
-- [logical-stage] All tables use surrogate `INT IDENTITY` PKs and all FKs reference surrogate PKs; natural identifiers `user_id` and `unique_space_code` are demoted to named UNIQUE attributes.
-- [logical-stage] `USER_ACCOUNT.email` is treated as a candidate key and constrained by `UQ_USER_ACCOUNT_email`; this follows the rubric/candidate-key expectation although upstream only lists email as stored user information.
-- [logical-stage] Nullable notes/details (`decision_note`, `usage_notes`, completion-dependent fields, assignment-dependent fields) are nullable where the source does not prove mandatory value at row creation.
-- [logical-stage] `SPACE_FACILITY` has a surrogate `space_facility_id` PK to satisfy the project-wide “every table surrogate INT PK” rule, plus a unique pair constraint to preserve association uniqueness.
+- [upstream] DEPARTMENT and lookup entities (`ROLE`, `ACCOUNT_STATUS`, `SPACE_STATUS`, `BOOKING_STATUS`, `MAINTENANCE_STATUS`) are modeled as separate entities/tables.
+- [upstream] `decision_outcome` on `APPROVAL_DECISION` references `BOOKING_STATUS`; only `approved` and `rejected` are meaningful decision outcomes, but the domain is not further restricted at this stage.
+- [upstream] `decision_note` and `rejection_reason` are distinct facts on `APPROVAL_DECISION`.
+- [upstream] The source word “closed” maps to the listed status “temporarily closed.”
+- [upstream] “manager” in approval is treated as the “facility manager” role.
+- [upstream] `BOOKING_REQUEST` has at most one `USAGE_SESSION` because a session records one start-to-end use.
+- [upstream] `ASSIGNED_TO` is optional on `MAINTENANCE_RECORD` because assignment timing is not stated.
+- [logical-stage] Every table uses a surrogate `INT IDENTITY` primary key; natural/business identifiers are demoted to named `UNIQUE` attributes.
+- [logical-stage] `USER_ACCOUNT.email` is treated as a candidate key and constrained unique for account identification; this follows common account semantics and is recorded as an assumption because the source stores email but does not explicitly say it is unique.
+- [logical-stage] `SPACE_FACILITY` uses a surrogate `space_facility_id` primary key plus `UQ_SPACE_FACILITY_space_id_facility_id` to satisfy the all-table surrogate-PK standard while preventing duplicate associations.
+- [logical-stage] `decision_note`, `usage_notes`, `actual_end_time`, `final_condition_of_space`, `completion_time`, and `result_note` are nullable because they are optional or lifecycle-dependent in the upstream workflow.
+- [logical-stage] Full enforcement of rejected decision reason depends on either seeded lookup IDs or a later code pattern; the logical schema records the FK and a nonblank reason CHECK, and leaves the cross-table conditional as implementation logic.
 
 ## 6. Open Questions Carried Forward and Newly Raised
 
-- Question: How is Space usage policy enforced, if at all, when evaluating a booking request? — Affects `SPACE.usage_policy`; no logical enforcement added.
-- Question: How should the same-space overlapping approved bookings rule be enforced after conceptual design? — Affects `BOOKING_REQUEST`; proposed implementation options are trigger/procedure/transaction logic.
-- Question: How should the rule that under-maintenance, closed, or retired spaces cannot be booked be enforced after conceptual design? — Affects `BOOKING_REQUEST`, `SPACE`, and possibly `MAINTENANCE_RECORD`; requires cross-table implementation logic.
-- Question: From which prior status can a Booking Request become Cancelled, who can set it, and under what condition? — Affects booking status lifecycle; no transition CHECK added beyond allowed values.
-- Question: From which prior status can a Booking Request become No-show, who can set it, and under what condition? — Affects booking status lifecycle; no transition CHECK added beyond allowed values.
-- Question: Which listed user roles are included in the generic “Staff” who can view booking history, upcoming bookings, spaces under maintenance, and no-show bookings? — Affects authorization outside ordinary relational constraints.
-- Question: Which roles may report maintenance issues? — Affects `MAINTENANCE_RECORD.reporter_user_account_id`; role restriction unresolved.
-- Question: Which roles may assign the assigned staff member on a maintenance record? — Affects assignment workflow and authorization; role restriction unresolved.
-- Question: What are the allowed status values and transitions for Maintenance Record status? — Affects `MAINTENANCE_RECORD.status`; no CHECK added.
-- Question: Does recording an Approval Decision automatically update Booking Request status, or is the status update handled separately? — Affects consistency between `APPROVAL_DECISION.decision_outcome` and `BOOKING_REQUEST.status`; no automatic rule asserted.
-- Question: Does a Maintenance Record status automatically update Space current status to under maintenance, or is Space current status maintained independently? — Affects `MAINTENANCE_RECORD.status` and `SPACE.current_status`; no synchronization rule asserted.
-- Question: Are department administrators intended to have responsibilities beyond submitting booking requests as users? — Affects authorization only; no additional table/relationship added.
-- Question: What are the allowed values for `USER_ACCOUNT.account_status`? — Newly raised at logical stage because upstream names the attribute but gives no values, so no CHECK can be added.
-- Question: Must `BOOKING_REQUEST.expected_number_of_participants` be less than or equal to `SPACE.capacity`? — Newly raised/explicitly carried as a logical integrity question because upstream provides both facts but does not require the comparison.
+- Question: How, if at all, should the stored usage policy be enforced against booking requests? — Affects `SPACE.usage_policy` and booking validation.
+- Question: Which listed account roles are included in generic “Staff” viewing permissions? — Affects authorization, not table structure.
+- Question: Which prior booking status, trigger, and actor set a booking request to cancelled? — Affects booking lifecycle implementation and possible audit/event design.
+- Question: Which prior booking status, trigger, and actor set a booking request to no-show? — Affects booking lifecycle implementation and possible audit/event design.
+- Question: What are the allowed maintenance status values and transitions? — Affects `MAINTENANCE_STATUS` seed values and lifecycle logic.
+- Question: Which role is allowed to report a maintenance issue? — Affects authorization logic for `MAINTENANCE_RECORD.reported_by_user_account_id`.
+- Question: Who assigns the assigned staff member on a maintenance record, and when is assignment required? — Affects assignment workflow and possible assignment audit.
+- Question: Does creating/opening a maintenance record automatically change the related space status to under maintenance, or is space status updated independently? — Affects synchronization logic between `MAINTENANCE_RECORD` and `SPACE`.
+- Question: What criteria determine whether a booking request requires approval? — Affects approval workflow rules.
+- Question: Should Layer-A-only requester eligibility and special-equipment checks become explicit requirements? — Affects possible future authorization/equipment request entities.
+- [logical-stage] Should `BOOKING_STATUS` include a stable machine-readable `status_code` in addition to `status_name` so `APPROVAL_DECISION` can enforce `rejected ⇒ rejection_reason` with a deterministic persisted-code pattern? — Affects implementation of `BR-14`.
+- [logical-stage] Should expected participants be constrained to `SPACE.capacity`? — Upstream stores both values but does not require this comparison.
 
-## 7. Logical Design Self-Check Summary
+## 7. Relational Schema Diagram (Crow's-Foot)
 
-Full self-check details are logged in `.opencode/logging/self-check-log.md`.
+```mermaid
+erDiagram
+    ROLE {
+        INT role_id PK
+        NVARCHAR role_name UK
+    }
+    ACCOUNT_STATUS {
+        INT account_status_id PK
+        NVARCHAR status_name UK
+    }
+    DEPARTMENT {
+        INT department_id PK
+        NVARCHAR department_name UK
+        INT head_user_account_id FK
+    }
+    USER_ACCOUNT {
+        INT user_account_id PK
+        NVARCHAR user_id UK
+        NVARCHAR full_name
+        NVARCHAR email UK
+        NVARCHAR phone_number
+        INT department_id FK
+        INT role_id FK
+        INT account_status_id FK
+    }
+    SPACE_STATUS {
+        INT space_status_id PK
+        NVARCHAR status_name UK
+    }
+    SPACE {
+        INT space_id PK
+        NVARCHAR unique_space_code UK
+        NVARCHAR space_name
+        NVARCHAR space_type
+        NVARCHAR building
+        NVARCHAR floor
+        NVARCHAR room_number
+        INT capacity
+        NVARCHAR usage_policy
+        INT space_status_id FK
+    }
+    FACILITY {
+        INT facility_id PK
+        NVARCHAR facility_name
+    }
+    SPACE_FACILITY {
+        INT space_facility_id PK
+        INT space_id FK
+        INT facility_id FK
+    }
+    BOOKING_STATUS {
+        INT booking_status_id PK
+        NVARCHAR status_name UK
+    }
+    BOOKING_REQUEST {
+        INT booking_request_id PK
+        INT requester_user_account_id FK
+        INT space_id FK
+        INT booking_status_id FK
+        DATETIME2 requested_start_time
+        DATETIME2 requested_end_time
+        NVARCHAR purpose_of_use
+        INT expected_number_of_participants
+    }
+    APPROVAL_DECISION {
+        INT approval_decision_id PK
+        INT booking_request_id FK
+        INT decided_by_user_account_id FK
+        INT decision_outcome_booking_status_id FK
+        DATETIME2 decision_time
+        NVARCHAR decision_note
+        NVARCHAR rejection_reason
+    }
+    USAGE_SESSION {
+        INT usage_session_id PK
+        INT booking_request_id FK "unique"
+        INT checked_in_by_user_account_id FK
+        INT completed_by_user_account_id FK
+        DATETIME2 actual_start_time
+        NVARCHAR initial_condition_of_space
+        DATETIME2 actual_end_time
+        NVARCHAR final_condition_of_space
+        NVARCHAR usage_notes
+    }
+    MAINTENANCE_STATUS {
+        INT maintenance_status_id PK
+        NVARCHAR status_name UK
+    }
+    MAINTENANCE_RECORD {
+        INT maintenance_record_id PK
+        INT space_id FK
+        INT reported_by_user_account_id FK
+        INT assigned_to_user_account_id FK
+        INT maintenance_status_id FK
+        NVARCHAR problem_description
+        DATETIME2 start_time
+        DATETIME2 completion_time
+        NVARCHAR result_note
+    }
 
-- Entity-to-table coverage: PASS
-- Attribute coverage: PASS
-- Surrogate `INT` PK standardization (natural keys demoted to named UNIQUE; FKs reference surrogate): PASS
-- Relationship mapping (many-side FKs left non-unique): PASS
-- Key and constraint naming (no prose-only in-row rule): PASS
-- FK referential actions (explicit, consistently reasoned): PASS
-- Business rule classification: PASS
-- Assumptions/open questions: PASS
+    USER_ACCOUNT |o--o{ DEPARTMENT : manages
+    DEPARTMENT ||--o{ USER_ACCOUNT : has_users
+    ROLE ||--o{ USER_ACCOUNT : classifies
+    ACCOUNT_STATUS ||--o{ USER_ACCOUNT : statuses
+    SPACE_STATUS ||--o{ SPACE : statuses
+    SPACE ||--o{ SPACE_FACILITY : has_association
+    FACILITY ||--o{ SPACE_FACILITY : appears_in
+    BOOKING_STATUS ||--o{ BOOKING_REQUEST : statuses
+    BOOKING_STATUS ||--o{ APPROVAL_DECISION : decision_outcomes
+    MAINTENANCE_STATUS ||--o{ MAINTENANCE_RECORD : statuses
+    USER_ACCOUNT ||--o{ BOOKING_REQUEST : submits
+    SPACE ||--o{ BOOKING_REQUEST : is_selected_for
+    BOOKING_REQUEST ||--o{ APPROVAL_DECISION : has_decisions
+    USER_ACCOUNT ||--o{ APPROVAL_DECISION : makes_decisions
+    BOOKING_REQUEST ||--o| USAGE_SESSION : has_usage_session
+    USER_ACCOUNT ||--o{ USAGE_SESSION : checks_in
+    USER_ACCOUNT |o--o{ USAGE_SESSION : completes
+    SPACE ||--o{ MAINTENANCE_RECORD : has_records
+    USER_ACCOUNT ||--o{ MAINTENANCE_RECORD : reports
+    USER_ACCOUNT |o--o{ MAINTENANCE_RECORD : is_assigned_to
+```

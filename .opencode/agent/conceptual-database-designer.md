@@ -184,7 +184,19 @@ Before finalising each entity, scan for a `type` / `category` / `kind` / `classi
 
 `BOOKING_REQUEST` must carry exactly one purpose attribute — `purpose_of_use` — with the lecture / examination / seminar / workshop / meeting / student-activity / administrative-event set documented as its values. A `booking_type` / `booking_category` attribute is a fabricated duplicate (the source never names a booking "type"/"category"); remove it and keep the value set on `purpose_of_use`.
 
----
+### Rule 3.3 — Authorized design directive: DEPARTMENT and controlled-vocabulary entities
+
+The upstream analysis (its Rule 10 directive) models the following as their own entities — NOT as plain string attributes. Model them accordingly in the Chen ERD (each gets its own rectangle, relationship diamonds to owning entities, and per-entity attribute diagrams per Rule 7). Carry all Assumptions forward. These are authorized directives, NOT invented elements under Rule 3.
+
+- **DEPARTMENT**: entity with `department_name`, a `belongs_to` relationship from USER_ACCOUNT, and an `is_managed_by` relationship to USER_ACCOUNT.
+- **ROLE**: entity with `role_name`, a `has_role` relationship from USER_ACCOUNT.
+- **ACCOUNT_STATUS**: entity with `status_name`, a `has_account_status` relationship from USER_ACCOUNT.
+- **SPACE_STATUS**: entity with `status_name`, a `has_space_status` relationship from SPACE.
+- **BOOKING_STATUS**: entity with `status_name`, a `has_booking_status` relationship from BOOKING_REQUEST.
+- **MAINTENANCE_STATUS**: entity with `status_name`, a `has_maintenance_status` relationship from MAINTENANCE_RECORD.
+- **APPROVAL_DECISION has_decision_outcome BOOKING_STATUS**: `decision_outcome` on `APPROVAL_DECISION` references the same `BOOKING_STATUS` entity (no separate entity created). Draw an additional relationship diamond `has_decision_outcome` between `APPROVAL_DECISION` and `BOOKING_STATUS` in the overview diagram. Cardinality: `APPROVAL_DECISION 1..1 — BOOKING_STATUS 0..*`.
+
+Open descriptive catalogs (`space_type`, `facility_name`) remain as plain string attributes at the conceptual level — do NOT model them as entities.
 
 ### Rule 4 — Traceability
 
@@ -255,45 +267,93 @@ Do not model as attributes any values whose sole purpose is to reference, identi
 
 Foreign keys and relationship-reference attributes belong to the Logical Database Design and Physical Database Design stages, not the Conceptual Database Design stage.
 
-### Rule 7 — One line per relationship in the ERD diagram
+### Rule 7 — Chen-notation ERD split into overview + per-entity attribute diagrams
 
 #### 1. Core Principle
 
-Every distinct relationship (including every distinct foreign-key reference) must be drawn as its own separate line in the Mermaid ERD. The number of lines in the diagram between any two entities must equal the number of distinct relationships listed for that entity pair in §4 Relationship Constraints. Never merge two or more distinct relationships into a single representative line.
+The conceptual ERD in §ERD must be drawn in **Chen notation** (entities = rectangles, relationships = diamonds, attributes = ovals), NOT crow's-foot / relational-table notation. Do NOT emit a Mermaid `erDiagram` block — that produces table-style boxes and belongs to the logical stage (file 03).
 
-#### 2. Multiple References to the Same Entity
+Because a single diagram with all entities, relationships, AND attributes is too large to read in Markdown, split the ERD into **two layers**:
 
-When one entity references another entity more than once (two or more distinct roles), each reference is drawn as its own line with its own role label — not collapsed into one line.
+- **§ERD-Overview: Entity-Relationship Overview** — ONE diagram containing ONLY entity rectangles and relationship diamonds with cardinality edge labels. No attribute ovals. This diagram shows the full system structure at a glance.
+- **§ERD-Entities: Per-Entity Attribute Diagrams** — one small diagram PER entity, each showing that entity's rectangle connected to all of its attribute ovals (with types and PK markers). No relationships in these diagrams.
 
-**Required examples:**
-- `USER` → `USAGE_SESSION`: draw **two** lines — `checks_in` and `completes`.
-- `USER` → `MAINTENANCE_RECORD`: draw **two** lines — `reports` and `is_assigned_to`.
+Both layers together form the complete Chen ERD. §4 Relationship Constraints remains the authoritative textual model for cardinality and participation.
 
-**Correct Mermaid syntax** (multiple labelled relationships between the same pair are fully supported):
+#### 2. Required Mermaid technique — overview diagram
+
+Use a Mermaid `flowchart` with:
+- Entity: `NAME[NAME]:::entity`
+- Relationship: `REL{verb}:::rel`
+- Cardinality on the entity↔diamond edge label, always wrapped in double quotes.
+
+**Syntax rules (mandatory — Mermaid will fail to parse otherwise):**
+- ALWAYS wrap every edge label in double quotes, because labels contain `(`, `)`, `.` and `*` which break the parser when unquoted.
+- Correct: `USER_ACCOUNT ---|"1 to 0..*"| SUBMITS`
+- Wrong: `USER_ACCOUNT ---|1 (0..*)| SUBMITS`
+
+Example overview:
 ```mermaid
-USER ||--o{ USAGE_SESSION : checks_in
-USER ||--o{ USAGE_SESSION : completes
-USER ||--o{ MAINTENANCE_RECORD : reports
-USER ||--o{ MAINTENANCE_RECORD : is_assigned_to
+flowchart TB
+  USER_ACCOUNT[USER_ACCOUNT]:::entity
+  BOOKING_REQUEST[BOOKING_REQUEST]:::entity
+  SPACE[SPACE]:::entity
+  SUBMITS{submits}:::rel
+  SELECTS{selects}:::rel
+
+  USER_ACCOUNT ---|"1 to 0..*"| SUBMITS
+  SUBMITS ---|"N to 1..1"| BOOKING_REQUEST
+  BOOKING_REQUEST ---|"N to 1..1"| SELECTS
+  SELECTS ---|"1 to 0..*"| SPACE
+
+  classDef entity fill:#cfe8ff,stroke:#1b4965,stroke-width:2px,color:#1b4965
+  classDef rel fill:#ffe8b3,stroke:#8a5a00,stroke-width:1px,color:#6b4400
 ```
 
-#### 3. Prohibited Justification
+#### 3. Required Mermaid technique — per-entity attribute diagrams
 
-Do not claim that Mermaid `erDiagram` cannot display repeated lines between the same entity pair — this is false. The "one representative line" simplification, and any reasoning that depends on it, is forbidden. The diagram and §4 must agree on the relationship count.
+Each entity gets its own small `flowchart` with:
+- The entity rectangle at the center.
+- Each attribute as an oval: `attr_name(["label"]):::attr`
+- The identifier attribute is marked with a `(PK)` suffix inside the quoted label.
+- Do NOT use `<u>...</u>` — htmlLabels may be off and it renders literally.
+- Plain lines connecting each attribute to the entity (no edge labels needed).
 
-#### 4. Cardinality Symbols Must Match the Participation Text
+Example per-entity diagram:
+```mermaid
+flowchart LR
+  USER_ACCOUNT[USER_ACCOUNT]:::entity
+  a1(["user_id (PK) : string"]):::attr
+  a2(["full_name : string"]):::attr
+  a3(["email : string"]):::attr
+  a4(["phone_number : string"]):::attr
+  a5(["role : string"]):::attr
+  a6(["account_status : string"]):::attr
+  a1 --- USER_ACCOUNT
+  a2 --- USER_ACCOUNT
+  a3 --- USER_ACCOUNT
+  a4 --- USER_ACCOUNT
+  a5 --- USER_ACCOUNT
+  a6 --- USER_ACCOUNT
 
-Each relationship line's Mermaid cardinality symbol must accurately reflect the participation described in §4. Distinct relationships with different participation must use different symbols — they must not share an identical symbol while the prose alone carries the distinction.
+  classDef entity fill:#cfe8ff,stroke:#1b4965,stroke-width:2px,color:#1b4965
+  classDef attr fill:#e8ffe8,stroke:#2a6b2a,stroke-width:0.5px,color:#2a6b2a
+```
 
-**Required example — `USER` ↔ `USAGE_SESSION`:**
-- `CHECKED_IN_BY`: mandatory on the session side (every usage session has exactly one check-in user) → `USER ||--o{ USAGE_SESSION`.
-- `COMPLETED_BY`: optional until completion (a session may have zero or one completing user) → `USER |o--o{ USAGE_SESSION`.
+#### 4. Multiple relationships between the same pair
 
-If the diagram symbol and the §4 participation text disagree, the diagram is incorrect.
+Chen notation handles this natively: draw a **separate diamond** for each distinct relationship (e.g. `USER_ACCOUNT —checks_in→ USAGE_SESSION` and `USER_ACCOUNT —completes→ USAGE_SESSION` are two diamonds in the overview). The old "one representative line" Mermaid workaround is forbidden.
 
-#### 5. Final Check
+#### 5. Cardinality labels must match §4
 
-Before delivery, count the relationship lines in the diagram and confirm the total equals the number of rows in §4. Any mismatch means a relationship was silently merged or dropped, and must be fixed.
+The cardinality label on each entity↔diamond edge in the overview must match the multiplicity stated in §4 Relationship Constraints. Participation (optional vs mandatory) is carried in the §4 text and shown in the edge label format `"1 to 0..*"`.
+
+#### 6. Final check
+
+Before delivery:
+- Count the relationship diamonds in the overview diagram and confirm the total equals the number of rows in §4. Any mismatch means a relationship was dropped or merged — fix it.
+- Count the per-entity attribute diagrams and confirm there is exactly one per entity listed in §3. Any missing diagram is incomplete.
+- Confirm every attribute oval in each per-entity diagram matches the attribute list in §3 for that entity. No extra, no missing.
 
 ### Rule 8 — Data type not always string
 
@@ -336,13 +396,10 @@ Conceptual types are coarse and indicative only. Do **not** specify SQL Server t
 1. Read the business requirements analysis document and understand the entities, attributes, relationships, cardinalities, and participation constraints.
 2. Identify all entities and their attributes, ensuring that each attribute is traceable to the source.
 3. Identify all relationships between entities, ensuring that each relationship is traceable to the source and that cardinalities and participation constraints are correctly defined.
-4. Create a conceptual ERD using Mermaid.js syntax, ensuring that all entities, attributes, and relationships are represented accurately.
-4b. Mermaid multi-relationship workaround: Mermaid `erDiagram` does not reliably render more than one relationship line between the same pair of entities. When two or more distinct relationships exist between the same entity pair (e.g. `USER checks_in` `USAGE_SESSION` and `USER` `completes` `USAGE_SESSION`), apply the following:
-    - In the Mermaid diagram block: render only **one representative relationship line** between the pair, using a combined label such as checks_in_and_completes. Add a footnote below the diagram block: `"Note: [Entity A]–[Entity B] represents N distinct roles — see §4 Relationship Constraints for full detail."`
-    - In §4 Relationship Constraints: list each relationship as a separate row with its own cardinality, participation, and explanation as normal.
-    - In §6 Design Reasoning: explain why multiple relationships between the same pair are kept separate at the conceptual level even though the diagram merges them visually.
-Never omit a relationship from §4 just because Mermaid cannot render it separately — the table is the authoritative model; the diagram is a visual aid.
-
+4. Create the conceptual ERD in **Chen notation** using Mermaid `flowchart`, split into two layers per Rule 7:
+   a. One **overview diagram** (§ERD-Overview): all entities as rectangles, all relationships as diamonds, cardinality on edges. No attributes.
+   b. One **per-entity attribute diagram** (§ERD-Entities) for each entity: the entity rectangle surrounded by its attribute ovals with types and PK markers. No relationships.
+4b. Each distinct relationship gets its own diamond in the overview — including multiple relationships between the same entity pair. §4 Relationship Constraints remains the authoritative model; the diagrams are visual aids. Never omit a relationship from §4 just because of diagram layout.
 5. Write the conceptual database design document following the template `.opencode/templates/conceptual-design-template.md`, ensuring that all sections are completed and that the document is structured correctly.
 6. Include a traceability section that maps each entity, attribute, and relationship in the design back to the corresponding item in the business requirements analysis document.
 When writing §5 Business Rule Coverage, apply the following completeness check:
@@ -365,7 +422,7 @@ When writing §5 Business Rule Coverage, apply the following completeness check:
 ## Skills Used
 
 - Conceptual Data Designing.
-- Mermaid.js Syntax for ER diagrams.
+- Mermaid.js `flowchart` syntax for Chen-notation ER diagrams (overview: entity rectangles + relationship diamonds; per-entity: entity + attribute ovals).
 - Cardinality and Modality Mapping
 
 ## Hard Constraints
