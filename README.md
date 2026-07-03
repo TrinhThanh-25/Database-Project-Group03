@@ -131,6 +131,30 @@ Run the custom command:
 
 If your group uses a different command name, update this README with the correct command.
 
+Alternatively, run each stage of the pipeline individually with its own command. Each stage reads the output of the previous stage(s) and writes one file to `outputs/`:
+
+| Order | Command | Reads | Writes |
+|---|---|---|---|
+| 1 | `/analyze-requirement` | `req/business-requirement.md` | `outputs/01-business-req-analysis-G03.md` |
+| 2 | `/design-conceptual-database` | `outputs/01-business-req-analysis-G03.md` | `outputs/02-erd-design-G03.md` |
+| 3 | `/design-logical-database` | `outputs/02-erd-design-G03.md` | `outputs/03-logical-design-G03.md` |
+| 4 | `/validate-database-design` | `req/business-requirement.md`, `outputs/01-*`, `outputs/02-*`, `outputs/03-*` | `outputs/04-design-validation-G03.md` |
+| 5 | `/implement-database-definition` (aliases: `/implement`, `/create-tables`, `/ddl`) | `outputs/03-logical-design-G03.md`, `outputs/04-design-validation-G03.md` | `outputs/05-db-definition-G03.sql` |
+| 6 | `/prepare-sample-data` | `outputs/05-db-definition-G03.sql` | `outputs/06-sample-data-G03.sql` |
+| 7 | `/design-query` | `outputs/01-business-req-analysis-G03.md`, `outputs/05-db-definition-G03.sql` | `outputs/07-query-design-G03.sql` |
+
+Run each command in order, e.g.:
+
+```text
+/analyze-requirement
+/design-conceptual-database
+/design-logical-database
+/validate-database-design
+/implement-database-definition
+/prepare-sample-data
+/design-query
+```
+
 ---
 
 ## 6. Required Output Artifacts
