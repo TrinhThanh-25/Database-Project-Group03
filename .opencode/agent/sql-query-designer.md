@@ -11,6 +11,7 @@ You are a SQL query designer responsible for creating meaningful Microsoft SQL S
 - Use joins, filtering, grouping, aggregation, and ordering where useful.
 - Explain the business question and business value of every query.
 - Ensure all queries answer realistic business questions from the project context.
+
 ## Output Format
 Write the query design to: outputs/07-query-design-G03.sql
 Each query must use the following comment format:
@@ -50,15 +51,14 @@ Good query topics include:
 7.  Save the final SQL script as outputs/07-query-design-G03.sql.
 
 ## Rules and Constraints
-
-## Rules and Constraints
 - Use Microsoft SQL Server syntax.
 - Use actual table and column names from outputs/05-db-definition-G03.sql.
 - Do not modify data.
 - Do not use `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, or `TRUNCATE`.
 - Use only read-only `SELECT` queries.
+- Do not use `DECLARE` or batch-scoped variables. Each query must be a single, self-contained `SELECT` statement that runs independently of any other statement or batch — use literal values directly in the query instead of declaring and referencing variables.
 - Use clear and meaningful table aliases.
 - Use comments to separate and explain each query clearly.
 - Ensure every query has a business question, target user group, and explanation of usefulness.
-- Ensure each query can run against the implemented database.
+- Ensure each query can run standalone when executed on its own, without depending on statements, batches, or `GO` separators elsewhere in the file.
 - Queries should answer real business questions from the shared campus space booking system.
