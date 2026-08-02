@@ -1,50 +1,52 @@
-cat > .opencode/skills/db-design-pipeline/SKILL.md <<'EOF'
 ---
 name: db-design-pipeline
-description: Analyze business requirements and produce conceptual ERD, logical database design, and DDL documents step by step.
+description: Transform campus-space requirements into sequential SQL Server database design, migration, concurrency, test-data, analytical-query, and tuning artifacts for Phases 1 and 2.
 compatibility: opencode
 ---
 
 # Database Design Pipeline Skill
 
-Use this skill when the user asks to transform business requirements into a database design.
+## Discovery
 
-## Important behavior
+1. Run `ls -la` before assuming any path exists.
+2. Read `AGENTS.md` completely.
+3. Locate the applicable requirement under `req/` and read it completely.
+4. Read the assigned stage's agent file, template, and rubric completely.
+5. Read the immediately preceding artifact as the primary input; do not re-derive later stages directly from raw requirements.
 
-Before assuming anything, inspect the project:
+## Shared discipline
 
-1. Run `ls -la`.
-2. Locate requirement files under `req/`, `docs/`, or files passed by the user.
-3. Read the relevant requirement files fully before designing.
-4. If the requirement is incomplete, continue with explicit assumptions, but also create an unresolved questions section.
+- Target Microsoft SQL Server unless the user specifies otherwise.
+- Preserve requirement → entity → relationship → table → constraint/query traceability.
+- Mark every inferred/proposed element visibly and record it under Assumptions.
+- Carry every unresolved Open Question forward.
+- Never strengthen nullability, uniqueness, checks, or cardinality beyond source evidence.
+- Perform stage self-checks without creating repository command/reasoning log files. Put only user-relevant assumptions, open questions, traceability, and reproducible test evidence in deliverables.
+- Stop a downstream implementation stage when its upstream design is only a scaffold or has blocking review failures.
 
-## Required output files
+## Phase 1 sequence
 
-Create or update the following files:
+Use outputs 01–07 and the workflow declared in `AGENTS.md`.
 
-1. `outputs/01-business-requirement-analysis-G03.md`
-2. `outputs/02-erd-design-G03.md`
-3. `outputs/03-logical-design-G03.md`
-4. `outputs/04-design-validation-G03.sql`
-5. `outputs/05-db-definition-G03.sql`
-6. `outputs/06-sample-data-G03.sql`
-7. `outputs/07-query-design-G03.sql`
+## Phase 2 sequence
 
-Do not skip any Markdown file.
+1. Preserve/read `req/phase-2-business-requirement.md`.
+2. Complete `outputs/08-requirement-change-analysis-G03.md`.
+3. Complete `outputs/09-updated-erd-and-logical-design-G03.md`, including Mermaid `erDiagram`, FDs, and 3NF proof.
+4. Implement additive, data-preserving `outputs/10-schema-migration-G03.sql`.
+5. Complete `outputs/11-concurrency-design-G03.md`.
+6. Implement `outputs/12-concurrency-implementation-G03.sql` using one shared protocol for every approval path.
+7. Add repeatable two-session tests under `outputs/13-concurrency-tests-G03/`.
+8. Add a deterministic generator under `outputs/14-data-generator-G03/` for at least three academic years and 100,000 bookings.
+9. Implement all four reports in `outputs/16-analytical-queries-G03.sql`.
+10. Measure and document conflict-check, room-finder, and two non-room-finder report indexes in `outputs/15-index-tuning-report-G03.md`.
 
-## Execution Order
+The `16`-then-`15` execution order is intentional: the assignment's filenames put the tuning report before the query file numerically, but measured tuning requires finalized executable queries. Keep the assigned filenames unchanged.
 
-1. /analyze-requirement
-2. /conceptual-design
-3. /logical-design
-4. /validate-design
-5. /implement-database
-6. /generate-test-data
-7. /design-queries
+## Phase 2 gates
 
-## Rules and Constraints
-
-- Each step must be executed in order, and the output of each step must be saved to the specified file.
-- Do not jump to later steps without completing the previous ones.
-- If any step fails, report the issue and stop the pipeline.
-
+- Do not execute a scaffold containing a deliberate `THROW` guard.
+- Do not use destructive drop/recreate logic for migration.
+- Demonstrate the concurrency race before claiming prevention, then verify the protected workflow with two sessions.
+- Do not claim index improvement without actual before/after execution evidence on the same generated dataset.
+- Run a final traceability, naming, source-strength, 3NF, row-count, overlap, and acknowledgement coverage review before delivery.

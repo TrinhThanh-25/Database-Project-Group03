@@ -88,7 +88,7 @@ The SQL file must also include:
 - Ensure booking status values exactly match the allowed values in the database schema.
 - Ensure exceptional cases are represented without breaking database constraints.
 - If the sample script assumes a clean database after `outputs/05-db-definition-G03.sql`, state that clearly in the header. If idempotency is required by the user, implement it explicitly with a dependency-safe approach.
-- Keep internal self-check notes in `.opencode/logging/self-check-log.md`, command/reasoning logs in `.opencode/logging/run-command-log.md`, and review notes in `.opencode/logging/review-log.md`; do not place internal agent self-check content in the user-facing SQL output.
+- Perform the required self-check without creating repository log files; do not place internal reasoning or self-check notes in the user-facing SQL output.
 
 ## Required Pre-Write Checklist
 
