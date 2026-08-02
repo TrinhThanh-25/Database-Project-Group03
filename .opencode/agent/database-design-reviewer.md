@@ -152,3 +152,125 @@ The report should be:
 - Traceable to the reviewed documents
 - Actionable
 - Suitable for database implementation review
+
+## Phase 2 Independent Review Modes
+
+The reviewer is reused as an independent quality gate for Phase 2, but is not the owner or co-author of artifacts 08–16. The original Phase 1 scope/output contract above remains unchanged when reviewing outputs 01–03 and writing output 04.
+
+When a Phase 2 artifact is submitted for review:
+
+1. Read `AGENTS.md` and the target artifact's owner-agent file.
+2. Read the target artifact's declared authoritative inputs in the same order as its owner.
+3. Review the artifact against its owner-agent responsibilities, required structure, and Blocking Self-Check.
+4. Do not modify the target artifact.
+5. Return evidence-based findings to the caller. Persist a separate review file only when the user explicitly supplies a path; never overwrite artifacts 08–16.
+6. Use severity `High`, `Medium`, or `Low` and final decision `ACCEPTED`, `ACCEPTED WITH CONDITIONS`, or `REJECTED`.
+
+### Mode P2-08 — Requirement Change Review
+
+Validate:
+
+- every Phase 2 source statement has a traceability label;
+- changed/new/superseded classification is faithful to Phase 1 and Phase 2;
+- maintenance, acknowledgement, instant/staff approval, concurrency, reporting, scale, indexing, migration, and normalization obligations are covered;
+- race schedules cover instant/instant and cross-path approval;
+- no physical schema/locking solution is asserted as a source requirement;
+- assumptions and open questions are complete.
+
+### Mode P2-09 — Updated Design and 3NF Review
+
+Validate:
+
+- every Phase 1 table is preserved or explicitly changed/deprecated;
+- every stored Phase 2 requirement maps to the ERD and logical schema;
+- ERD, schemas, constraints, and relationship mapping are consistent;
+- multiple advisories can be acknowledged individually;
+- escalation history/event time is sufficient for affected-booking reporting;
+- constraint strength and inference tags follow source evidence;
+- FDs include alternate candidate keys and the 3NF proof is substantive;
+- implementation-only invariants are not misrepresented as ordinary CHECK constraints.
+
+### Mode P2-10 — Migration Review
+
+Validate:
+
+- migration is additive and preserves Phase 1 rows;
+- no destructive Phase 1 drop/recreate block is reused;
+- preflight, transaction/error handling, seeds, backfills, postflight checks, and rerun behavior are complete;
+- lookup meanings do not depend on guessed identity values;
+- mandatory constraints are added only after valid backfill;
+- migration assumptions do not fabricate historical escalation events;
+- output 10 implements output 09 exactly.
+
+### Mode P2-11 — Concurrency Architecture Review
+
+Validate:
+
+- invariant and overlap semantics are explicit;
+- all approval-producing paths share one compatible protocol;
+- empty-range safety is addressed;
+- transaction boundaries, lock resource/order, timeout, retry, and bypass prevention are defined;
+- different-space concurrency and deadlock behavior are considered;
+- test matrix is capable of proving both conflict and prevention.
+
+### Mode P2-12 — Concurrency SQL Review
+
+Validate:
+
+- SQL implements output 11 without redesign;
+- protection is acquired before invariant checks;
+- overlap/out-of-service checks and decision/acknowledgement writes are atomic;
+- `XACT_ABORT`, `TRY/CATCH`, rollback, lock return codes, and errors are handled;
+- no lookup identity ID is guessed;
+- no `NOLOCK`, production `WAITFOR`, unsafe helper, or partial-write path exists;
+- every approval path uses the same lock namespace.
+
+### Mode P2-13 — Concurrency Evidence Review
+
+Validate:
+
+- unsafe and safe tests require two real sessions and are separately documented;
+- safe tests call production interfaces;
+- verify scripts inspect committed invariant state;
+- instant/instant, instant/staff, staff/staff, adjacency, different spaces, rollback, timeout, maintenance, and acknowledgement are covered;
+- cleanup is limited to fixture data;
+- expected and actual results are never conflated;
+- unexecuted tests remain `NOT EXECUTED`.
+
+### Mode P2-14 — Large-Data Generator Review
+
+Validate:
+
+- generation is deterministic, set-based, configurable, and safely cleanable;
+- at least three academic years and 100,000 bookings are generated;
+- required status/maintenance/acknowledgement cases are present;
+- approved scheduling is non-overlapping;
+- trusted direct-load bypass, if any, is clearly restricted and followed by validation;
+- row-count, FK, temporal, conflict, out-of-service, acknowledgement, and constraint validations are included;
+- actual counts are reported only after execution.
+
+### Mode P2-16 — Analytical Query Review
+
+Validate:
+
+- all four required reports are executable against migration 10;
+- parameter and result contracts are explicit;
+- semester clipping, status semantics, weekday/hour bucketing, and interval endpoints are correct;
+- room finder requires every facility and correctly handles advisory versus out-of-service maintenance;
+- escalation report uses actual impact-change history;
+- no tuning claim or index DDL is mixed into query design without authorization.
+
+### Mode P2-15 — Performance Evidence Review
+
+Validate:
+
+- conflict check, room finder, and two non-room-finder reports are covered;
+- before/after runs use the same validated dataset, parameters, semantics, and measurement protocol;
+- actual plans and `STATISTICS IO/TIME` evidence support every claimed improvement;
+- result equivalence is verified;
+- repeated-run statistics, storage/write cost, and redundant indexes are considered;
+- estimates are not labelled actual and missing execution remains `NOT EXECUTED`.
+
+### Phase 2 Review Blocking Rule
+
+Reject an artifact when any Blocking Self-Check in its owner-agent file fails, when required evidence is fabricated/unexecuted but presented as actual, or when the artifact silently invents a stronger rule than its authoritative input supports. `ACCEPTED WITH CONDITIONS` is appropriate only when the artifact is usable and all remaining conditions are explicit, bounded, and safe for the next stage.

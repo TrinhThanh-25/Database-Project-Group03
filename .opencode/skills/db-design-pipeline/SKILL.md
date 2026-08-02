@@ -31,15 +31,15 @@ Use outputs 01–07 and the workflow declared in `AGENTS.md`.
 ## Phase 2 sequence
 
 1. Preserve/read `req/phase-2-business-requirement.md`.
-2. Complete `outputs/08-requirement-change-analysis-G03.md`.
-3. Complete `outputs/09-updated-erd-and-logical-design-G03.md`, including Mermaid `erDiagram`, FDs, and 3NF proof.
-4. Implement additive, data-preserving `outputs/10-schema-migration-G03.sql`.
-5. Complete `outputs/11-concurrency-design-G03.md`.
-6. Implement `outputs/12-concurrency-implementation-G03.sql` using one shared protocol for every approval path.
-7. Add repeatable two-session tests under `outputs/13-concurrency-tests-G03/`.
-8. Add a deterministic generator under `outputs/14-data-generator-G03/` for at least three academic years and 100,000 bookings.
-9. Implement all four reports in `outputs/16-analytical-queries-G03.sql`.
-10. Measure and document conflict-check, room-finder, and two non-room-finder report indexes in `outputs/15-index-tuning-report-G03.md`.
+2. Use `requirement-change-analyst.md` to complete `outputs/08-requirement-change-analysis-G03.md`.
+3. Use `phase2-database-design-updater.md` to complete `outputs/09-updated-erd-and-logical-design-G03.md`, including Mermaid `erDiagram`, FDs, and 3NF proof.
+4. Use `schema-migration-engineer.md` to implement additive, data-preserving `outputs/10-schema-migration-G03.sql`.
+5. Use `database-concurrency-architect.md` to complete `outputs/11-concurrency-design-G03.md`.
+6. Use `database-concurrency-implementation-engineer.md` to implement `outputs/12-concurrency-implementation-G03.sql` with one shared protocol for every approval path.
+7. Use `database-concurrency-test-engineer.md` to add repeatable two-session tests under `outputs/13-concurrency-tests-G03/`.
+8. Use `large-scale-data-generation-engineer.md` to add a deterministic generator under `outputs/14-data-generator-G03/` for at least three academic years and 100,000 bookings.
+9. Use `analytical-query-designer.md` to implement all four reports in `outputs/16-analytical-queries-G03.sql`.
+10. Use `database-performance-tuning-engineer.md` to measure and document conflict-check, room-finder, and two non-room-finder report indexes in `outputs/15-index-tuning-report-G03.md`.
 
 The `16`-then-`15` execution order is intentional: the assignment's filenames put the tuning report before the query file numerically, but measured tuning requires finalized executable queries. Keep the assigned filenames unchanged.
 

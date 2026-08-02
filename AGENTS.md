@@ -12,13 +12,31 @@ This project transforms business requirements into database design artifacts, th
 
 ## Available Agents
 
+### Phase 1 Agents
+
 - `business-analyst.md` — business requirement analysis
 - `conceptual-database-designer.md` — conceptual database design
 - `logical-database-designer.md` — logical database design
-- `database-design-reviewer.md` — database design validation
+- `database-design-reviewer.md` — Phase 1 design validation and independent Phase 2 quality gates
 - `database-definition-implementation-engineer.md` — database implementation
 - `sample-data-preparer.md` — sample data preparation
 - `sql-query-designer.md` — SQL query design
+
+### Phase 2 Output-Owner Agents
+
+- `requirement-change-analyst.md` — owns artifact 08 requirement change analysis
+- `phase2-database-design-updater.md` — owns artifact 09 combined ERD, logical design, FDs, and 3NF
+- `schema-migration-engineer.md` — owns artifact 10 additive, data-preserving migration
+- `database-concurrency-architect.md` — owns artifact 11 concurrency design
+- `database-concurrency-implementation-engineer.md` — owns artifact 12 production concurrency SQL
+- `database-concurrency-test-engineer.md` — owns artifact 13 two-session test suite
+- `large-scale-data-generation-engineer.md` — owns artifact 14 deterministic 100,000+ row generator
+- `database-performance-tuning-engineer.md` — owns artifact 15 evidence-based index tuning report
+- `analytical-query-designer.md` — owns artifact 16 analytical query SQL
+
+Each Phase 2 artifact has exactly one owner. `database-design-reviewer.md` may validate a Phase 2 artifact as an independent quality gate, but must not co-author or directly modify that artifact.
+
+For Phase 2 agents, the `Required Output Structure` (or required directory/script sections) inside each owner-agent file is the stage template, and its `Blocking Self-Check` is the stage rubric unless a separate template/rubric file is later added. Do not fall back to an unrelated Phase 1 template or rubric.
 
 ## Workflow Order
 
@@ -45,6 +63,16 @@ Validation tasks: database-design-reviewer
 DDL implementation tasks: database-definition-implementation-engineer
 Sample data tasks: sample-data-preparer
 SQL query tasks: sql-query-designer
+
+Phase 2 requirement-change tasks: requirement-change-analyst
+Phase 2 combined ERD/logical/3NF tasks: phase2-database-design-updater
+Phase 2 migration tasks: schema-migration-engineer
+Concurrency architecture tasks: database-concurrency-architect
+Concurrency implementation tasks: database-concurrency-implementation-engineer
+Concurrency test tasks: database-concurrency-test-engineer
+Large-scale generation tasks: large-scale-data-generation-engineer
+Analytical report tasks: analytical-query-designer
+Index and execution-plan tuning tasks: database-performance-tuning-engineer
 
 ## DBMS
 
@@ -79,15 +107,15 @@ These apply across all 7 agents, not only the first step:
 
 Phase 2 extends, and does not replace, artifacts 01–07. Follow this order:
 
-8. Requirement Change Analysis — business-analyst
-9. Updated ERD, Logical Design, Functional Dependencies, and 3NF — conceptual-database-designer then logical-database-designer
-10. Data-Preserving Schema Migration — database-definition-implementation-engineer
-11. Concurrency Design — logical-database-designer with database-design-reviewer validation
-12. Concurrency Implementation — database-definition-implementation-engineer
-13. Concurrency Tests — database-design-reviewer validates evidence
-14. Large Sample Data Generator — sample-data-preparer
-15. Analytical Queries — sql-query-designer (writes numbered artifact `16`)
-16. Index Tuning Report — sql-query-designer with database-design-reviewer validation (writes numbered artifact `15`)
+8. Requirement Change Analysis — requirement-change-analyst
+9. Updated ERD, Logical Design, Functional Dependencies, and 3NF — phase2-database-design-updater
+10. Data-Preserving Schema Migration — schema-migration-engineer
+11. Concurrency Design — database-concurrency-architect
+12. Concurrency Implementation — database-concurrency-implementation-engineer
+13. Concurrency Tests — database-concurrency-test-engineer
+14. Large Sample Data Generator — large-scale-data-generation-engineer
+15. Analytical Queries — analytical-query-designer (writes numbered artifact `16`)
+16. Index Tuning Report — database-performance-tuning-engineer (writes numbered artifact `15`)
 
 For Phase 2, each stage reads its declared upstream artifact as primary input and may read Phase 1 artifacts only as the implementation baseline. Execute requested stages sequentially. The assignment numbers the tuning report `15` and analytical SQL `16`, but tuning depends on executable analytical queries; therefore execution order is `... 14 → 16 → 15`, while filenames remain exactly as assigned.
 

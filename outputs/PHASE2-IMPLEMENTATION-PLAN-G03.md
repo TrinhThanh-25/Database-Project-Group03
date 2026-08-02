@@ -132,18 +132,18 @@ Exit criteria: report contains reproducible before/after scripts and measured ev
 
 The assigned filenames number tuning as 15 and queries as 16. The dependency-safe execution order is `14 → 16 → 15` because measured tuning requires the final query text; artifact filenames are not renumbered.
 
-| Artifact | Purpose | Initial status |
-|---|---|---|
-| `req/phase-2-business-requirement.md` | Verbatim source | Created |
-| `outputs/08-requirement-change-analysis-G03.md` | Change/race analysis | Scaffolded; analysis pending |
-| `outputs/09-updated-erd-and-logical-design-G03.md` | ERD, schema, FDs, 3NF | Scaffolded; depends on 08 |
-| `outputs/10-schema-migration-G03.sql` | Additive migration | Scaffolded; depends on 09 |
-| `outputs/11-concurrency-design-G03.md` | Conflict schedules/solution | Scaffolded; depends on 09 |
-| `outputs/12-concurrency-implementation-G03.sql` | Safe procedures | Scaffolded; depends on 10/11 |
-| `outputs/13-concurrency-tests-G03/` | Two-session demonstrations | Scaffolded; depends on 12 |
-| `outputs/14-data-generator-G03/` | Large deterministic dataset | Scaffolded; depends on 10/12 |
-| `outputs/15-index-tuning-report-G03.md` | Measured tuning results | Scaffolded; cannot be completed without SQL Server execution |
-| `outputs/16-analytical-queries-G03.sql` | Four required reports | Scaffolded; depends on 09/10 |
+| Artifact | Owner agent | Purpose | Initial status |
+|---|---|---|---|
+| `req/phase-2-business-requirement.md` | Pipeline input | Verbatim source | Created |
+| `outputs/08-requirement-change-analysis-G03.md` | `requirement-change-analyst.md` | Change/race analysis | Scaffolded; analysis pending |
+| `outputs/09-updated-erd-and-logical-design-G03.md` | `phase2-database-design-updater.md` | ERD, schema, FDs, 3NF | Scaffolded; depends on 08 |
+| `outputs/10-schema-migration-G03.sql` | `schema-migration-engineer.md` | Additive migration | Scaffolded; depends on 09 |
+| `outputs/11-concurrency-design-G03.md` | `database-concurrency-architect.md` | Conflict schedules/solution | Scaffolded; depends on 10 |
+| `outputs/12-concurrency-implementation-G03.sql` | `database-concurrency-implementation-engineer.md` | Safe procedures | Scaffolded; depends on 10/11 |
+| `outputs/13-concurrency-tests-G03/` | `database-concurrency-test-engineer.md` | Two-session demonstrations | Scaffolded; depends on 12 |
+| `outputs/14-data-generator-G03/` | `large-scale-data-generation-engineer.md` | Large deterministic dataset | Scaffolded; depends on 10/12/13 |
+| `outputs/15-index-tuning-report-G03.md` | `database-performance-tuning-engineer.md` | Measured tuning results | Scaffolded; depends on 12/14/16 and SQL Server execution |
+| `outputs/16-analytical-queries-G03.sql` | `analytical-query-designer.md` | Four required reports | Scaffolded; depends on 09/10/14 |
 
 ## 6. Open questions that block final implementation choices
 
