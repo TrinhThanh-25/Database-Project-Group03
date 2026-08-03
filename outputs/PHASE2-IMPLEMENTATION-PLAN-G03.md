@@ -1,11 +1,11 @@
-# Phase 2 Detailed Implementation Plan — Group 03
+/# Phase 2 Detailed Implementation Plan — Group 03
 
 ## 1. Goal and delivery policy
 
 Extend the existing SQL Server Phase 1 design in place, preserve existing data, demonstrate concurrency safety, generate at least three academic years and 100,000 bookings, implement all four required reports, and provide repeatable before/after index evidence.
 
 Phase 1 files `01` through `07` remain historical baselines. Phase 2 work reads them but writes only the new `08` through `16` artifacts, the Phase 2 requirement source, and agent/skill documentation.
-
+ 
 ## 2. Baseline findings
 
 - Phase 1 implements 14 tables. The relevant core tables are `SPACE`, `SPACE_FACILITY`, `BOOKING_REQUEST`, `BOOKING_STATUS`, `APPROVAL_DECISION`, and `MAINTENANCE_RECORD`.
