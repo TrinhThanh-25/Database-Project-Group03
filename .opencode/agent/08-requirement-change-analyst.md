@@ -52,6 +52,7 @@ Phase 2 statements override conflicting Phase 1 rules only within their stated s
 6. “Active” and “still open” must not be silently equated with existing Phase 1 status values unless the mapping is explicitly proposed and tagged.
 7. Do not silently decide whether current statuses `Checked in` and `Completed` count as historically approved for reports.
 8. Treat requested intervals as unspecified at their endpoints until an explicit `[proposed]` half-open convention is accepted.
+9. Classify Phase 2 Section 1.2 operating conditions about beginning-of-semester high-volume submissions and popular spaces receiving overlapping requests in a short interval as `New`, because these operating conditions are introduced by Phase 2. Keep only the existing approved-booking non-overlap invariant as `Unchanged but affected` when comparing against Phase 1 BR-09/BR-10.
 
 ## Required Concurrency Analysis
 
