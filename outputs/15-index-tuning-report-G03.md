@@ -1,426 +1,98 @@
-# Phase 2 Index Tuning Report - Group 03
+# Artifact 15 — Index Tuning Report
 
-Final status: `NOT EXECUTED`
+## 1. Status, environment, and dataset
 
-This artifact was prepared by `database-performance-tuning-engineer.md`, but final evidence-based tuning cannot be completed yet. Artifact 16 is still a scaffold and throws `51002`, artifact 14 is marked `NOT EXECUTED`, and this workspace has no SQL Server client available for actual execution plans or `STATISTICS IO/TIME` capture.
+Status: **EXECUTED — PASS** on 2026-08-10.
 
-No performance result, improvement percentage, or final index recommendation is claimed in this report.
+- SQL Server 2022 Developer Edition 16.0.4255.1 (CU25), Linux, compatibility level 160.
+- Dataset: `G03-GEN-V2`, 100,000 generated bookings across academic-year starts 2027–2029; artifact 14 validation returned `PASS` with zero approved-overlap errors.
+- The corrected generator has 10,890 advisory acknowledgements and 70,000 approval decisions: 15,000 automatic approved decisions use the active `System` actor, while 45,000 approved and 10,000 rejected decisions use active facility staff. It uses four space types, four capacity bands, seven purposes, and every space has all seven lifecycle statuses. Validation rejects an automatic decision on an unconfigured type, an over-capacity participant count, or an overlapping approval made after an out-of-service escalation. W3 and W4 deliberately use approval history rather than inferring historical approval from current status. The actor correction does not change W1–W4 predicates or result aggregates because none of those workloads filters by decision actor.
+- Actual plans were captured with `STATISTICS PROFILE/XML`; reads and time used `SET STATISTICS IO,TIME ON`.
 
-## 1. Executive Summary
+The baseline contained clustered PK indexes and `UQ_SPACE_FACILITY_space_id_facility_id`; there were no manual indexes on `BOOKING_REQUEST`, `APPROVAL_DECISION`, or `MAINTENANCE_RECORD`.
 
-The required tuning workloads are:
+## 2. Fixed workloads and parameters
 
-1. Approved-booking conflict check from artifact 12.
-2. Room finder query from artifact 16.
-3. Approved booking hours per space/semester from artifact 16.
-4. Approved bookings by weekday/hour/semester from artifact 16.
+| Workload | Parameters |
+|---|---|
+| W1 conflict check | Space `G03-GEN-S-050`; statuses approved/checked-in; `2028-09-01 08:00–09:00` |
+| W2 room finder | `2029-09-01 10:00–11:00`; capacity 30; generated Projector facility ID; active advisories are present |
+| W3 approved hours | Semester `[2027-09-01, 2028-09-01)` |
+| W4 weekday/hour | Same semester; booking-start weekday/hour buckets |
 
-Current outcome:
+The table preserves the captured before/after summary. Acceptance depends on the reproducible same-session protocol in Section 5, not on a required number of repetitions.
 
-| Workload | Status | Reason |
-| --- | --- | --- |
-| Conflict check | `NOT EXECUTED` | Procedure logic exists in artifact 12, but no validated generated dataset or SQL Server execution evidence is available. |
-| Room finder | `BLOCKED` | `outputs/16-analytical-queries-G03.sql` is still scaffold-only. |
-| Approved hours report | `BLOCKED` | `outputs/16-analytical-queries-G03.sql` is still scaffold-only. |
-| Weekday/hour report | `BLOCKED` | `outputs/16-analytical-queries-G03.sql` is still scaffold-only. |
+## 3. Before/after evidence
 
-AGENTS.md states the practical execution order is `14 -> 16 -> 15` even though the tuning report filename is numbered `15`. Artifact 15 must be rerun after artifact 16 is implemented and the generator has been executed/validated on SQL Server.
+| Workload | Main logical reads before → after | CPU ms before → after | Elapsed ms before → after | Rows/checksum unchanged |
+|---|---:|---:|---:|---|
+| W1 conflict | Booking 833 → 6 | 5 → 0 displayed | 4 → 0 displayed | 1 / 1,123,453,404 — PASS |
+| W2 room finder | Booking 83,300 → 700; maintenance 800 → 400; space-facility 208 → 208 | 417 → 5 | 416 → 4 | 100 / 66,896 — PASS |
+| W3 approved hours | Booking 833 → 111; approval decision 968 → 181 | 45 → 39 | 45 → 39 | 109 / 16 — PASS |
+| W4 weekday/hour | Booking 833 → 111; approval decision 968 → 181 | 35 → 28 | 34 → 28 | 28 / 228 — PASS |
 
-## 2. Environment and SQL Server Settings
+Zero milliseconds is SQL Server timer resolution, not zero work.
 
-Actual environment: `NOT EXECUTED`
+Actual-plan observations:
 
-SQL Server version/edition:
+- **W1:** the clustered scan of 100,000 booking rows became a seek on `IX_BOOKING_REQUEST_space_status_start`; requested end time is included to avoid a lookup. Concurrency correctness still comes from the reviewed lock protocol.
+- **W2:** repeated full booking scans became per-space seeks on `IX_BOOKING_REQUEST_space_status_start`; per-space maintenance scans became seeks on `IX_MAINTENANCE_RECORD_space_status_impact_start`. The existing `(space_id, facility_id)` unique index remained the facility access path. A separately tested status-leading booking index was not retained because the actual plan did not use it.
+- **W3:** the 100,000-row booking scan became a time-range seek on `IX_BOOKING_REQUEST_start_space`. Approval history uses the covering `IX_APPROVAL_DECISION_outcome_booking_time`; it is scanned because the measured semester contains a large fraction of approved decisions, but reads fall from 968 to 181.
+- **W4:** the booking side became a bounded start-time seek on `IX_BOOKING_REQUEST_start_space`; approval history uses the same covering decision index. Deterministic weekday/start-hour grouping was unchanged.
 
-```sql
-SELECT @@VERSION AS sql_server_version;
-SELECT SERVERPROPERTY('Edition') AS edition,
-       SERVERPROPERTY('ProductVersion') AS product_version,
-       SERVERPROPERTY('ProductLevel') AS product_level;
-```
-
-Required database settings to record before measurement:
-
-```sql
-SELECT name, compatibility_level, is_read_committed_snapshot_on, snapshot_isolation_state_desc
-FROM sys.databases
-WHERE database_id = DB_ID();
-```
-
-Required benchmark session settings:
+## 4. Final index DDL
 
 ```sql
-SET STATISTICS IO ON;
-SET STATISTICS TIME ON;
-SET NOCOUNT ON;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.BOOKING_REQUEST') AND name=N'IX_BOOKING_REQUEST_space_status_start')
+    CREATE INDEX IX_BOOKING_REQUEST_space_status_start
+    ON dbo.BOOKING_REQUEST(space_id,booking_status_id,requested_start_time)
+    INCLUDE(requested_end_time);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.BOOKING_REQUEST') AND name=N'IX_BOOKING_REQUEST_start_space')
+    CREATE INDEX IX_BOOKING_REQUEST_start_space
+    ON dbo.BOOKING_REQUEST(requested_start_time,space_id)
+    INCLUDE(requested_end_time);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.APPROVAL_DECISION') AND name=N'IX_APPROVAL_DECISION_outcome_booking_time')
+    CREATE INDEX IX_APPROVAL_DECISION_outcome_booking_time
+    ON dbo.APPROVAL_DECISION(decision_outcome_booking_status_id,booking_request_id,decision_time);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.MAINTENANCE_RECORD') AND name=N'IX_MAINTENANCE_RECORD_space_status_impact_start')
+    CREATE INDEX IX_MAINTENANCE_RECORD_space_status_impact_start
+    ON dbo.MAINTENANCE_RECORD(space_id,maintenance_status_id,impact_level_id,start_time)
+    INCLUDE(completion_time);
 ```
 
-No actual settings were captured because `sqlcmd` is not installed in this workspace.
+The two booking indexes have different leading keys: same-space conflict/current room availability and historical time-range reporting. The approval-decision index covers the historical approval predicate. The maintenance index serves room availability. The unused status-leading booking candidate and an extra facility index were not retained.
 
-## 3. Dataset Configuration and Validation Status
+## 5. Reproduction and limitations
 
-Planned fixed dataset from artifact 14:
+On a clean database, run artifacts 05, 06, 10, 12, 14 and 16, then confirm artifact 14 validation, including its statistics refresh. Use one SQL Server session and the exact parameters in Section 2:
 
-| Setting | Planned value |
-| --- | --- |
-| Run prefix | `G03-LS` |
-| Target bookings | `100000` |
-| Optional target | `500000` |
-| Academic years | `2028-2029`, `2029-2030`, `2030-2031` |
-| Semesters | `6` |
-| Requesters | `800` |
-| Staff users | `20` |
-| Spaces | `20` |
-| Facilities | `10` |
+1. Execute W1–W4 once with statistics disabled as a compilation/warm-up pass.
+2. Enable `SET STATISTICS IO ON` and `SET STATISTICS TIME ON` with `STATISTICS XML OFF`; execute each workload once and save its messages and result set as the baseline.
+3. Disable IO/TIME statistics, enable `SET STATISTICS XML ON`, execute each workload once with the same parameters, save the actual plans, then disable XML. This separate capture avoids adding plan serialization to the reported elapsed time.
+4. Apply exactly the four retained indexes in Section 4 and execute the same statistics-disabled warm-up pass once.
+5. Repeat Steps 2 and 3 once with unchanged parameters.
+6. Compare the saved result sets before comparing reads, elapsed time, or operators. A tuning result is invalid if the result differs.
 
-Validation status: `NOT EXECUTED`
-
-Required validation gate before tuning:
-
-```text
-outputs/14-data-generator-G03/05-validate-generated-data.sql
-```
-
-The tuning run must not proceed unless validation shows:
-
-| Check | Required result |
-| --- | --- |
-| Generated booking count | At least `100000` |
-| Academic-year coverage | At least `3` academic years |
-| Approved booking overlap pairs | `0` |
-| Unlabelled approved/out-of-service maintenance overlaps | `0` |
-| Missing advisory acknowledgements | `0` |
-| Duplicate acknowledgement pairs/events | `0` |
-| FK/orphan checks | `0` orphan rows |
-| `DBCC CHECKCONSTRAINTS` | Empty result set |
-
-## 4. Existing Index Inventory
-
-Inventory source: static review of artifacts 05 and 10 only. This is not a live `sys.indexes` inventory.
-
-Existing primary key and unique constraints create SQL Server indexes for:
-
-| Table | Existing indexed constraints |
-| --- | --- |
-| `ROLE` | `PK_ROLE`, `UQ_ROLE_role_name` |
-| `ACCOUNT_STATUS` | `PK_ACCOUNT_STATUS`, `UQ_ACCOUNT_STATUS_status_name` |
-| `DEPARTMENT` | `PK_DEPARTMENT`, `UQ_DEPARTMENT_department_name` |
-| `USER_ACCOUNT` | `PK_USER_ACCOUNT`, `UQ_USER_ACCOUNT_user_id`, `UQ_USER_ACCOUNT_email` |
-| `SPACE_STATUS` | `PK_SPACE_STATUS`, `UQ_SPACE_STATUS_status_name` |
-| `SPACE` | `PK_SPACE`, `UQ_SPACE_unique_space_code` |
-| `FACILITY` | `PK_FACILITY` |
-| `SPACE_FACILITY` | `PK_SPACE_FACILITY`, `UQ_SPACE_FACILITY_space_id_facility_id` |
-| `BOOKING_STATUS` | `PK_BOOKING_STATUS`, `UQ_BOOKING_STATUS_status_name`, `UQ_BOOKING_STATUS_status_code` |
-| `BOOKING_REQUEST` | `PK_BOOKING_REQUEST` |
-| `APPROVAL_DECISION` | `PK_APPROVAL_DECISION` |
-| `USAGE_SESSION` | `PK_USAGE_SESSION`, `UQ_USAGE_SESSION_booking_request_id` |
-| `MAINTENANCE_STATUS` | `PK_MAINTENANCE_STATUS`, `UQ_MAINTENANCE_STATUS_status_name` |
-| `MAINTENANCE_RECORD` | `PK_MAINTENANCE_RECORD` |
-| `APPROVAL_METHOD` | `PK_APPROVAL_METHOD`, `UQ_APPROVAL_METHOD_method_code`, `UQ_APPROVAL_METHOD_method_name` |
-| `MAINTENANCE_IMPACT_LEVEL` | `PK_MAINTENANCE_IMPACT_LEVEL`, `UQ_MAINTENANCE_IMPACT_LEVEL_impact_level_code`, `UQ_MAINTENANCE_IMPACT_LEVEL_impact_level_name` |
-| `ACADEMIC_SEMESTER` | `PK_ACADEMIC_SEMESTER`, `UQ_ACADEMIC_SEMESTER_semester_code`, `UQ_ACADEMIC_SEMESTER_academic_year_label_semester_name` |
-| `INSTANT_APPROVAL_SPACE_TYPE` | `PK_INSTANT_APPROVAL_SPACE_TYPE`, `UQ_INSTANT_APPROVAL_SPACE_TYPE_space_type` |
-| `MAINTENANCE_IMPACT_EVENT` | `PK_MAINTENANCE_IMPACT_EVENT` |
-| `BOOKING_ADVISORY_ACKNOWLEDGEMENT` | `PK_BOOKING_ADVISORY_ACKNOWLEDGEMENT`, `UQ_BOOKING_ADVISORY_ACKNOWLEDGEMENT_booking_maintenance` |
-
-Live inventory query to run before measurement:
+W2–W4 are the procedures in artifact 16. Resolve the W2 facility without guessing its identity value:
 
 ```sql
-SELECT
-    OBJECT_SCHEMA_NAME(i.object_id) AS schema_name,
-    OBJECT_NAME(i.object_id) AS table_name,
-    i.name AS index_name,
-    i.type_desc,
-    i.is_unique,
-    i.is_primary_key,
-    i.is_unique_constraint,
-    STRING_AGG(COL_NAME(ic.object_id, ic.column_id), ', ')
-        WITHIN GROUP (ORDER BY ic.key_ordinal) AS key_columns
-FROM sys.indexes AS i
-JOIN sys.index_columns AS ic
-  ON ic.object_id = i.object_id
- AND ic.index_id = i.index_id
-WHERE i.object_id IN (
-    OBJECT_ID(N'dbo.BOOKING_REQUEST'),
-    OBJECT_ID(N'dbo.BOOKING_STATUS'),
-    OBJECT_ID(N'dbo.SPACE'),
-    OBJECT_ID(N'dbo.SPACE_FACILITY'),
-    OBJECT_ID(N'dbo.FACILITY'),
-    OBJECT_ID(N'dbo.MAINTENANCE_RECORD'),
-    OBJECT_ID(N'dbo.MAINTENANCE_IMPACT_LEVEL'),
-    OBJECT_ID(N'dbo.MAINTENANCE_IMPACT_EVENT'),
-    OBJECT_ID(N'dbo.ACADEMIC_SEMESTER')
-)
-GROUP BY i.object_id, i.index_id, i.name, i.type_desc, i.is_unique, i.is_primary_key, i.is_unique_constraint
-ORDER BY table_name, index_name;
+DECLARE @ConflictSpaceId INT=(SELECT space_id FROM dbo.SPACE WHERE unique_space_code=N'G03-GEN-S-050');
+SELECT b.booking_request_id,b.requested_start_time,b.requested_end_time
+FROM dbo.BOOKING_REQUEST b
+JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id
+WHERE b.space_id=@ConflictSpaceId
+  AND bs.status_code IN(N'approved',N'checked_in')
+  AND b.requested_start_time<'2028-09-01T09:00:00'
+  AND b.requested_end_time>'2028-09-01T08:00:00';
+
+DECLARE @ProjectorId INT=(SELECT facility_id FROM dbo.FACILITY WHERE facility_name=N'G03-GEN-Projector');
+DECLARE @Facilities NVARCHAR(MAX)=CONCAT(N'[',@ProjectorId,N']');
+EXEC dbo.usp_G03_FindAvailableSpaces '2029-09-01T10:00:00','2029-09-01T11:00:00',30,@Facilities;
+EXEC dbo.usp_G03_ReportApprovedHoursBySpace '2027-09-01T00:00:00','2028-09-01T00:00:00';
+EXEC dbo.usp_G03_ReportApprovedBookingStartsByWeekdayHour '2027-09-01T00:00:00','2028-09-01T00:00:00';
 ```
 
-## 5. Benchmark Protocol and Limitations
-
-Protocol required for the final tuning run:
-
-1. Deploy artifacts 05, 10, 12, 14, and 16.
-2. Run artifact 14 cleanup/generation/validation on one fixed target count.
-3. Save validation output.
-4. Capture live index inventory.
-5. For each workload, record exact SQL and parameters.
-6. Run one compilation/setup execution that is not counted.
-7. Run at least five measured warm-cache executions with `STATISTICS IO/TIME`.
-8. Save actual execution plans.
-9. Add one candidate index at a time.
-10. Rerun the same query with the same parameters and same dataset.
-11. Verify result equivalence.
-12. Record index size and write-path impact.
-
-Current limitations:
-
-- Artifact 16 is incomplete, so three required workload queries do not exist.
-- Artifact 14 has not been executed or validated.
-- Actual SQL Server plans, reads, CPU, elapsed time, memory grants, warnings, spills, and row estimates were not captured.
-- No index DDL is recommended because the agent rules require measurement first.
-
-## 6. Workload 1: Conflict Check Before/After
-
-Query identity: approved-booking conflict predicate inside:
-
-- `dbo.usp_SubmitBookingRequest`
-- `dbo.usp_ApproveBookingRequest`
-
-Relevant predicate from artifact 12:
-
-```sql
-WHERE br.space_id = @space_id
-  AND bs.status_code IN (N'approved', N'checked_in', N'completed')
-  AND br.requested_start_time < @requested_end_time
-  AND br.requested_end_time > @requested_start_time
-```
-
-Representative parameters to use after generator execution:
-
-```sql
-DECLARE @space_id INT = (
-    SELECT MIN(space_id)
-    FROM dbo.SPACE
-    WHERE unique_space_code LIKE N'G03-LS-SPACE-%'
-);
-DECLARE @requested_start_time DATETIME2(0) = '2029-02-10T10:00:00';
-DECLARE @requested_end_time   DATETIME2(0) = '2029-02-10T12:00:00';
-```
-
-Baseline plan summary: `NOT EXECUTED`
-
-Baseline metrics:
-
-| Metric | Value |
-| --- | --- |
-| Logical reads | `NOT EXECUTED` |
-| CPU time | `NOT EXECUTED` |
-| Elapsed time | `NOT EXECUTED` |
-| Actual rows | `NOT EXECUTED` |
-| Estimated rows | `NOT EXECUTED` |
-| Memory grant/spills | `NOT EXECUTED` |
-
-Bottleneck diagnosis: `NOT EXECUTED`
-
-Candidate index/query change: not recommended yet. A likely measurement candidate after baseline capture is a nonclustered index beginning with `BOOKING_REQUEST.space_id` and interval columns, but this remains an untested hypothesis and is not final DDL.
-
-Post-change plan summary: `NOT EXECUTED`
-
-Post-change metrics: `NOT EXECUTED`
-
-Absolute and percentage changes: `NOT EXECUTED`
-
-Result-equivalence check: `NOT EXECUTED`
-
-Keep/drop decision: `NOT EXECUTED`
-
-Concurrency note: even if an index improves the conflict check, it does not replace the transaction-owned `sp_getapplock` protocol from artifacts 11 and 12.
-
-## 7. Workload 2: Room Finder Before/After
-
-Query identity: `BLOCKED`
-
-Reason: `outputs/16-analytical-queries-G03.sql` is scaffold-only and throws:
-
-```text
-51002 Scaffold only: complete and migrate the Phase 2 logical design before implementing analytical queries.
-```
-
-Expected semantics from artifacts 08 and 09:
-
-- minimum capacity;
-- every requested facility must be present;
-- requested interval must not overlap approved occupancy for the same space;
-- requested interval must not overlap active out-of-service maintenance;
-- advisory maintenance does not remove the room from results, but may require notice/acknowledgement in OLTP paths.
-
-Baseline plan summary: `NOT EXECUTED`
-
-Baseline metrics: `NOT EXECUTED`
-
-Bottleneck diagnosis: `NOT EXECUTED`
-
-Candidate index/query-shape change: not recommended before the final query exists and is measured.
-
-Post-change plan summary: `NOT EXECUTED`
-
-Result-equivalence check: `NOT EXECUTED`
-
-Keep/drop decision: `NOT EXECUTED`
-
-## 8. Workload 3: Approved-Hours Report Before/After
-
-Query identity: `BLOCKED`
-
-Reason: artifact 16 is incomplete.
-
-Expected semantics:
-
-- report total approved booking hours by space for a supplied semester;
-- approved occupancy status set is `approved`, `checked_in`, `completed` per artifact 11 assumption;
-- semester boundaries come from `ACADEMIC_SEMESTER`.
-
-Baseline plan summary: `NOT EXECUTED`
-
-Baseline metrics: `NOT EXECUTED`
-
-Bottleneck diagnosis: `NOT EXECUTED`
-
-Candidate index/query-shape change: not recommended before actual query text, parameters, and baseline evidence exist.
-
-Post-change plan summary: `NOT EXECUTED`
-
-Result-equivalence check: `NOT EXECUTED`
-
-Keep/drop decision: `NOT EXECUTED`
-
-## 9. Workload 4: Weekday/Hour Report Before/After
-
-Query identity: `BLOCKED`
-
-Reason: artifact 16 is incomplete.
-
-Expected semantics:
-
-- report approved booking counts by weekday and hour for a supplied semester;
-- approved occupancy status set is `approved`, `checked_in`, `completed`;
-- semester boundaries come from `ACADEMIC_SEMESTER`.
-
-Baseline plan summary: `NOT EXECUTED`
-
-Baseline metrics: `NOT EXECUTED`
-
-Bottleneck diagnosis: `NOT EXECUTED`
-
-Candidate index/query-shape change: not recommended before actual query text, parameters, and baseline evidence exist.
-
-Post-change plan summary: `NOT EXECUTED`
-
-Result-equivalence check: `NOT EXECUTED`
-
-Keep/drop decision: `NOT EXECUTED`
-
-## 10. Final Index DDL and Deployment Order
-
-Final index DDL: none.
-
-Reason: the tuning agent may recommend and script indexes only after actual measurement on the finalized workloads and one fixed validated dataset. That evidence is not available.
-
-Deployment order for the future measured report:
-
-1. Capture baseline metrics with no manual tuning indexes.
-2. Create first candidate index.
-3. Refresh statistics only under the documented protocol.
-4. Rerun identical workload measurements.
-5. Keep or drop the candidate.
-6. Repeat for remaining candidates.
-7. Publish only the final minimal kept DDL.
-
-## 11. Redundant/Rejected Candidate Indexes
-
-No candidate index was tested, so no candidate is accepted or rejected as evidence.
-
-Pre-measurement cautions for the later tuning run:
-
-- Do not duplicate existing PK/UQ indexes.
-- Do not create filtered indexes that depend on hard-coded lookup identity values.
-- Do not cover every selected column by default.
-- Do not remove correctness predicates from room finder or conflict checks.
-- Do not use `NOLOCK`.
-- Do not treat an index as a substitute for the same-space application lock.
-
-## 12. Storage and Write Trade-Offs
-
-Storage/write analysis status: `NOT EXECUTED`
-
-The final measured report must include:
-
-```sql
-SELECT
-    OBJECT_SCHEMA_NAME(i.object_id) AS schema_name,
-    OBJECT_NAME(i.object_id) AS table_name,
-    i.name AS index_name,
-    SUM(ps.used_page_count) * 8.0 / 1024.0 AS used_mb
-FROM sys.indexes AS i
-JOIN sys.dm_db_partition_stats AS ps
-  ON ps.object_id = i.object_id
- AND ps.index_id = i.index_id
-WHERE OBJECT_SCHEMA_NAME(i.object_id) = N'dbo'
-GROUP BY i.object_id, i.name
-ORDER BY used_mb DESC;
-```
-
-Write-path impact to evaluate:
-
-- `BOOKING_REQUEST` insert/update cost for generator loads and OLTP approvals.
-- `APPROVAL_DECISION` insert cost.
-- `BOOKING_ADVISORY_ACKNOWLEDGEMENT` insert cost.
-- `MAINTENANCE_RECORD` impact/time update cost.
-- `SPACE_FACILITY` maintenance cost if room-finder indexes are added.
-
-## 13. Reproduction Instructions
-
-To complete artifact 15 with evidence:
-
-1. Run agent 16 and replace `outputs/16-analytical-queries-G03.sql` with executable analytical queries.
-2. Deploy artifacts 05, 10, 12, 14, and 16 in SQL Server.
-3. Run:
-
-```text
-outputs/14-data-generator-G03/99-cleanup-generated-data.sql
-outputs/14-data-generator-G03/01-generate-reference-data.sql
-outputs/14-data-generator-G03/02-generate-bookings.sql
-outputs/14-data-generator-G03/03-generate-maintenance.sql
-outputs/14-data-generator-G03/04-generate-acknowledgements.sql
-outputs/14-data-generator-G03/05-validate-generated-data.sql
-```
-
-4. Save validation output.
-5. Capture baseline index inventory.
-6. Capture actual plans and `STATISTICS IO/TIME` for all four workloads.
-7. Test candidate indexes one at a time.
-8. Verify result equivalence after each candidate.
-9. Fill this report with measured before/after evidence and final DDL.
-
-## 14. Assumptions, Limitations, and Open Questions
-
-Assumptions:
-
-- SQL Server remains the DBMS target.
-- Artifact 14's default `G03-LS` generated dataset is the intended fixed benchmark dataset.
-- Approved occupancy status set remains `approved`, `checked_in`, `completed`.
-- Room finder and reporting query semantics will be implemented in artifact 16 without changing business meaning.
-
-Limitations:
-
-- This report contains no actual execution evidence.
-- Artifact 16 is incomplete, so three required workloads cannot be benchmarked.
-- Artifact 14 validation has not been executed.
-- No final DDL is recommended.
-
-Open questions:
-
-- Which SQL Server version/edition and compatibility level will be used for final measurement?
-- Will the final dataset target be `100000` or `500000` bookings?
-- Will measurements be performed warm-cache only, or also cold-cache on an isolated test instance?
-- Which exact parameter sets from artifact 16 should represent average and worst-case room-finder/report workloads?
+This is classroom evidence from one SQL Server instance and one deterministic distribution. It does not claim production capacity or generalize beyond the measured parameters.

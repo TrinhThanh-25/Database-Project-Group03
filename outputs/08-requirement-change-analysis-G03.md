@@ -32,7 +32,7 @@ Phase 2 does not replace the Phase 1 system. It extends it in four major areas:
 3. Booking approval now has two paths: instant approval for selected space types when the request satisfies the usage policy, and existing staff approval for other requests. The business invariant is stronger than Phase 1 because it must hold when users and staff act simultaneously.
 4. Phase 2 adds analytical reports, large generated data, query tuning evidence, additive migration, concurrency evidence, and normalization validation obligations.
 
-The largest unresolved business choices are the meaning of "selected space types", how to evaluate "satisfy the usage policy", what counts as an active or open maintenance record, how interval endpoints overlap, and whether historically approved statuses such as checked-in or completed count as approved for reports.
+The remaining deployment choices are the exact selected space types, authoritative semester calendar dates, future facility quantity/condition semantics, and permissions not already fixed by Phase 1. Group 03 has approved one consistent demo interpretation for instant eligibility, the System decision actor, active/open maintenance, current occupancy, historical approval, half-open intervals, Vietnam-local timestamps, scalar semester bounds, and all-required-facilities matching; these decisions are recorded in Section 7 and are not treated as unresolved requirements.
 
 ## 3. Phase 2 Traceability-Label Catalog
 
@@ -77,7 +77,7 @@ The labels `P2-BR-*` are analytical identifiers [proposed — not stated in sour
 | P2-BR-35 | Indexing and tuning must compare execution plans and execution times before and after indexing. | Phase 2 Section 2, Indexing and Query Tuning paragraph. | New |
 | P2-BR-36 | Normalization validation must identify functional dependencies and ensure all relations satisfy at least 3NF. | Phase 2 Section 2, Normalization Validation paragraph. | New |
 | P2-BR-37 | The Phase 2 group report must include members, individual queries, LLM/agent improvements, concurrency conflicts/solutions/results, tuning results, FDs, and normal-form proof or steps to 3NF. | Phase 2 Section 3.1, Group Report bullets. | New |
-| P2-BR-38 | The repository must include the numbered Phase 2 artifacts 08 through 16. | Phase 2 Section 3.2, Group Agent Git Repository artifact list; AGENTS.md Phase 2 outputs. | New |
+| P2-BR-38 | The group agent repository must update `AGENT.md` and `SKILL.md`, briefly describe agent improvements, and include numbered Phase 2 artifacts 08 through 16. | Phase 2 Section 2, agent-update sentence; Section 3.2, Group Agent Git Repository artifact list. | New |
 | P2-BR-39 | The source spells artifact 16 with `.sq`, while Group 03 records and uses `.sql` for the SQL Server script. | Phase 2 Section 3.2 artifact list and the preservation note in `req/phase-2-business-requirement.md`; AGENTS.md Phase 2 Source and Outputs. | New |
 
 ## 4. Requirement Change Matrix
@@ -113,8 +113,8 @@ Superseded Phase 1 rule:
 Permission impacts and unresolved boundaries:
 
 - "Selected space types" is not defined in the source. The affected permission/scope of instant approval remains open (P2-BR-16).
-- "Satisfy the usage policy" is not executable from the Phase 2 source. Phase 1 already carried usage-policy enforcement as an open question; Phase 2 makes the question blocking for instant approval (P2-BR-16).
-- The source does not say whether instant approvals need an approval-decision audit comparable to staff approvals. This affects downstream design and migration but is not resolved here.
+- The source does not define an executable usage-policy evaluator. For the approved Group 03 demo, instant eligibility compares expected participants with `SPACE.capacity`; stored `usage_policy` remains unchanged and is not parsed.
+- Automatic approval is recorded in the existing decision history using the dedicated active actor whose role is `System` [approved demo decision — not stated in source].
 
 ## 6. Affected Entities, Facts, and Relationships
 
@@ -124,10 +124,10 @@ Affected Phase 1 entities and business facts:
 |---|---|---|
 | SPACE | Phase 1 BR-03/BR-04 store space details and current status. | Space remains the booked/maintained resource. Availability now depends on booking overlaps, out-of-service maintenance overlaps, advisory notices, and existing closed/retired rules. |
 | MAINTENANCE_RECORD | Phase 1 BR-17/BR-18 store space, reporter, assignment, problem, start/completion, status, and result. | Needs the business fact "impact level" with at least out-of-service and advisory values from Phase 2 Section 1.1. Multiple active records with mixed impact levels must be supported. |
-| Maintenance activity state [proposed — not stated in source] | Phase 1 open question: allowed maintenance status values and transitions are unresolved. | Phase 2 uses "active" and "still open"; the exact mapping to Phase 1 maintenance status remains open. |
+| Maintenance activity state [approved demo decision — not stated in source] | Phase 1 did not resolve the meaning of active/open. | Active/open maps to current status `Reported` or `In progress`; other transition rules remain open. |
 | BOOKING_REQUEST | Phase 1 BR-06/BR-08 store request details and status. | Must represent instant/staff approval outcome, advisory acknowledgement, and affected approved bookings for reports. |
-| APPROVAL_DECISION | Phase 1 BR-13 records staff decision maker, time, note, and outcome for approved/rejected staff decisions. | Phase 2 adds instant approval; whether automatic approval has an equivalent decision record is open. |
-| BOOKING_STATUS | Phase 1 BR-08 includes pending, approved, rejected, cancelled, checked in, completed, no-show. | Reports refer to "approved bookings"; whether checked-in or completed statuses count as approved history is open. |
+| APPROVAL_DECISION | Phase 1 BR-13 records decision maker, time, note, and outcome. | Staff and automatic approvals share this history relation; automatic approvals use the dedicated `System` actor [approved demo decision — not stated in source]. |
+| BOOKING_STATUS | Phase 1 BR-08 includes pending, approved, rejected, cancelled, checked in, completed, no-show. | Current occupancy is `approved`/`checked_in`; historical analytical approval is established by an approved `APPROVAL_DECISION` [approved demo decisions — not stated in source]. |
 | FACILITY | Phase 1 BR-05 stores facilities available in each space. | Room finder must filter available spaces by required facility list (P2-BR-24). |
 | USER_ACCOUNT | Phase 1 BR-01/BR-02 stores requester and staff roles. | Requesters must receive advisory notice; staff contact affected requesters; concurrent staff approvals are in scope. |
 | Usage session | Phase 1 BR-15/BR-16 stores actual check-in and completion facts. | Not directly changed, but generated data must include cancellations and no-shows, and reports may need to avoid confusing usage completion with approval state. |
@@ -166,12 +166,19 @@ New reporting and evidence rules:
 - The implementation must support large-data testing and tuning evidence (P2-BR-27, P2-BR-28, P2-BR-33 through P2-BR-35).
 - Updated design must include FDs and at least 3NF validation (P2-BR-36).
 
-Rules not resolved here:
+Decisions approved for the Group 03 demo after the initial analysis:
 
-- No policy predicate is invented for "satisfy the usage policy".
-- No qualifying space types are chosen.
-- No endpoint convention is chosen for overlapping intervals.
-- No final schema, transaction, locking, indexing, or stored-program mechanism is selected.
+- Instant eligibility compares expected participants with `SPACE.capacity`; stored `usage_policy` text remains unchanged and is not parsed.
+- Automatic decisions use a dedicated actor with role `System`.
+- Active/open maintenance means current status `Reported` or `In progress`.
+- Approved occupancy for the non-overlap invariant means current status `approved` or `checked_in`.
+- Historical analytical reports identify approval through an approved `APPROVAL_DECISION`, so later lifecycle states do not erase approval history.
+- Booking, maintenance, semester, decision, and impact-event timestamps are interpreted as Vietnam-local wall-clock values; system-generated timestamps are converted with SQL Server zone `SE Asia Standard Time`.
+- Interval operations use half-open `[start,end)` semantics.
+- Semester reports receive explicit start/end parameters; no semester master is required for the demo.
+- Room-finder facility input means every requested facility must be present; quantity and equipment-condition tracking remain outside the approved demo scope.
+
+The exact selected space types remain deployment configuration. Physical transaction and index mechanisms remain downstream implementation decisions rather than requirement facts.
 
 ## 8. Concurrent-Operation Conflict Analysis
 
@@ -209,64 +216,9 @@ Conflict:
 - Violated invariant: P2-BR-19, P2-BR-20, P2-BR-21.
 - This is both a logical booking conflict and a check-then-write race caused by concurrent execution.
 
-### 8.2 Schedule B: Staff approval versus instant approval
+The same check-then-write anomaly also applies to instant/staff and staff/staff combinations. Downstream artifacts must therefore use one protection protocol for every path that can create approved occupancy; three repeated schedules are not needed here.
 
-Initial state:
-
-- Pending Request R3 [proposed — not stated in source] and new Request R4 [proposed — not stated in source] target the same space with overlapping requested periods.
-- R3 is in the staff approval path.
-- R4 qualifies for instant approval.
-- No approved overlapping booking is visible before either operation records approval.
-
-Operation A:
-
-1. Staff member reviews R3.
-2. Staff member checks availability for the requested space/period.
-3. Staff member observes no approved overlapping booking.
-4. Staff member prepares to approve R3.
-
-Operation B:
-
-1. User submits R4 at approximately the same time.
-2. The system checks instant approval eligibility and availability.
-3. Before Operation A's result is visible to Operation B, the system observes no approved overlapping booking.
-4. The system prepares to approve R4 instantly.
-
-Conflict:
-
-- Availability observation made by staff path: R3 appears approvable.
-- Availability observation made by instant path: R4 appears approvable.
-- If both operations record approval, the same space has overlapping approved use.
-- Violated invariant: P2-BR-18, P2-BR-19, P2-BR-20, P2-BR-21.
-- This is both a logical booking conflict and a check-then-write race across two approval paths.
-
-### 8.3 Schedule C: Staff approval versus staff approval
-
-Initial state:
-
-- Pending Requests R5 and R6 [proposed — not stated in source] target the same space with overlapping periods.
-- Two staff members review the requests simultaneously.
-- No approved overlapping booking is visible before either decision is recorded.
-
-Operation A:
-
-1. Staff member A checks availability for R5.
-2. Staff member A observes no approved overlapping booking.
-3. Staff member A prepares to approve R5.
-
-Operation B:
-
-1. Staff member B checks availability for R6.
-2. Before Operation A's result is visible, Staff member B observes no approved overlapping booking.
-3. Staff member B prepares to approve R6.
-
-Conflict:
-
-- If both approvals are recorded, the same space has overlapping approved use.
-- Violated invariant: P2-BR-18, P2-BR-19, P2-BR-20, P2-BR-21.
-- This is a check-then-write race in the existing staff approval workflow, newly made explicit by Phase 2.
-
-### 8.4 Maintenance escalation impact schedule
+### 8.2 Maintenance escalation impact
 
 Initial state:
 
@@ -291,8 +243,8 @@ Reports:
 
 | Report obligation | P2 ID | Affected concepts |
 |---|---|---|
-| Total approved booking hours of each space for a given semester | P2-BR-22 | Space, booking request, booking status, semester definition [proposed — not stated in source] |
-| Number of approved bookings by weekday and hour for a given semester | P2-BR-23 | Booking request, booking status, requested/approved time period, semester definition [proposed — not stated in source] |
+| Total approved booking hours of each space for a given semester | P2-BR-22 | Space, booking request, approval history, and supplied semester bounds [approved demo decision — not stated in source] |
+| Number of approved bookings by weekday and hour for a given semester | P2-BR-23 | Booking request, approval history, requested start time, and supplied semester bounds [approved demo decision — not stated in source] |
 | Available spaces satisfying capacity, required facility list, and requested period | P2-BR-24 | Space, facility, booking overlap, out-of-service maintenance overlap, current space availability rules |
 | Approved bookings affected by escalation to out-of-service | P2-BR-25 | Maintenance record, impact-level change, approved booking overlap, requester contact need |
 
@@ -330,10 +282,12 @@ Normalization obligation:
 ## 11. Assumptions
 
 - Assumption: The `P2-BR-*` labels are analytical identifiers [proposed — not stated in source] created solely for traceability.
-- Assumption: "System/service behavior" is an analytical actor [proposed — not stated in source] for automatic approval because the source states automatic approval but does not name the acting user or audit actor.
+- Approved demo decision: automatic approval uses a dedicated active user whose role is `System`; the source itself does not name an audit actor.
+- Approved demo decisions: instant eligibility compares participants with capacity without parsing `usage_policy`; active/open maintenance is `Reported`/`In progress`; current occupancy is `approved`/`checked_in`; historical approval uses an approved `APPROVAL_DECISION`.
+- Approved demo conventions: intervals are half-open, `DATETIME2` values are Vietnam-local wall-clock values, semester bounds are scalar parameters, and room finding requires every requested facility.
 - Assumption: "Staff for requester contact" is an analytical actor [proposed — not stated in source] because the source requires staff to contact requesters after escalation but does not specify which staff role performs the contact.
 - Assumption: Example request, maintenance, and space labels used in concurrency schedules, such as R1 and M1, are scenario identifiers [proposed — not stated in source] and are not design identifiers.
-- Assumption: "Semester definition" in reporting is a required analytical concept [proposed — not stated in source] because reports are scoped to a given semester, but the source does not define semester dates, academic calendar storage, or how semester boundaries are supplied.
+- Assumption: authoritative semester calendar dates remain unspecified by the source; the approved demo receives explicit start/end bounds rather than persisting a semester master.
 - Assumption: Advisory acknowledgement may require more detail than a single unspecified flag [proposed — not stated in source]; the source only says the requester was informed and acknowledgement is stored with the booking.
 - Assumption carried from Phase 1: The source word "closed" maps to the listed status "temporarily closed."
 - Assumption carried from Phase 1: "Manager" in approval is treated as the facility manager role.
@@ -343,30 +297,22 @@ Normalization obligation:
 
 Phase 1 open questions still relevant:
 
-- Question: How, if at all, should the stored usage policy be enforced against booking requests? Phase 2 makes this blocking for instant approval (P2-BR-16).
 - Question: Which listed account roles are included in generic "Staff" viewing permissions?
 - Question: Which prior booking status, business event, and actor set a booking request to cancelled? Phase 2 data generation must include cancellations (P2-BR-33).
 - Question: Which prior booking status, business event, and actor set a booking request to no-show? Phase 2 data generation must include no-shows (P2-BR-33).
-- Question: What are the allowed maintenance status values and their transitions? Phase 2 adds active/open maintenance and impact-level changes (P2-BR-09 through P2-BR-11).
+- Question: What transitions other than the accepted active/open mapping (`Reported`/`In progress`) are allowed for maintenance status?
 - Question: Which role is allowed to report a maintenance issue?
 - Question: Who assigns the assigned staff member on a maintenance record, and at what point in the workflow is assignment required?
 - Question: Does creating or opening a maintenance record automatically change the related space status to under maintenance, or is the space status updated independently? Phase 2 narrows the rule by impact level but does not resolve status synchronization.
 - Question: Should Layer-A-only requester eligibility and special-equipment checks become explicit system requirements?
-- Question: Should expected participants be constrained to space capacity? Phase 2 room finder uses required capacity, but the source still does not state a booking-submission capacity rejection rule.
-- Question: Must every approved or rejected booking have exactly one approval decision record?
-- Question: Should booking status have stable machine-readable values in addition to display labels?
+- Question: Should non-instant staff approval reject over-capacity requests? The demo capacity comparison applies only to instant eligibility.
 
 New Phase 2 open questions:
 
 - Question: Which space types are "selected space types" for instant approval? Affects P2-BR-16 and artifacts 09 through 13.
-- Question: What does it mean for a request to "satisfy the usage policy"? The source does not define an executable predicate. Affects P2-BR-16 and artifacts 09 through 13.
-- Question: Does instant approval require the same approval audit facts as staff approval, or a different automatic-decision record? Affects P2-BR-16, P2-BR-17, and artifacts 09 through 12.
-- Question: What exactly counts as an "active" advisory or "still open" maintenance record? The source uses both phrases but does not map them to Phase 1 maintenance statuses. Affects P2-BR-07, P2-BR-09, P2-BR-11, and P2-BR-12.
 - Question: Are out-of-service and advisory the complete set of impact levels, or only the two values currently required by the source? Affects P2-BR-02.
 - Question: When a maintenance impact level is downgraded, is any requester notification required? The source only states contact support for advisory-to-out-of-service escalation. Affects P2-BR-11 through P2-BR-13.
-- Question: What interval endpoint convention defines "overlap" for bookings and maintenance periods? Requested intervals remain unspecified at endpoints until an explicit convention is accepted. Affects P2-BR-04, P2-BR-12, P2-BR-19, P2-BR-24, and P2-BR-25.
-- Question: For analytical reports, do checked-in and completed bookings count as "approved bookings", or only records whose current status is approved? Affects P2-BR-22, P2-BR-23, and P2-BR-25.
-- Question: How is a "given semester" defined or supplied for reports and generated data? Affects P2-BR-22, P2-BR-23, and P2-BR-33.
-- Question: For required facility list matching, must a space contain every requested facility, at least one requested facility, or support quantities/working condition? Affects P2-BR-24.
+- Question: What calendar dates define the authoritative semesters outside the fixed generated-data bands? Affects P2-BR-22, P2-BR-23, and P2-BR-33.
+- Question: Will future room finding require facility quantities or working-condition state beyond the approved all-required-facilities membership check? Affects P2-BR-24.
 - Question: For affected-booking contact after escalation, must the system store contact attempts or outcomes, or only support finding affected bookings? The source only requires finding so staff can contact requesters. Affects P2-BR-13 and P2-BR-25.
 - Question: Phase 2 Section 1.3 says tune one additional reporting query, while Section 2 and AGENTS.md require two reporting queries other than room finder. Group 03 should follow AGENTS.md unless the instructor clarifies otherwise. Affects P2-BR-27, P2-BR-34, and P2-BR-35.

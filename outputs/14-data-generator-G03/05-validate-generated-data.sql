@@ -1,274 +1,90 @@
-:r 00-config.sql
-/*
- Validate the generated large-scale dataset.
- Expected generated-data invariant failures are zero unless labelled otherwise.
-*/
-
 SET NOCOUNT ON;
-
-DECLARE @run_prefix NVARCHAR(20) = N'$(G03_RUN_PREFIX)';
-DECLARE @target_booking_count INT = $(G03_TARGET_BOOKINGS);
-DECLARE @base_date DATE = CONVERT(DATE, '$(G03_BASE_DATE)');
-
-PRINT 'Validation 1: target booking count and academic-year coverage.';
-SELECT
-    @target_booking_count AS requested_booking_count,
-    COUNT(*) AS actual_booking_count,
-    MIN(br.requested_start_time) AS min_requested_start_time,
-    MAX(br.requested_start_time) AS max_requested_start_time,
-    COUNT(DISTINCT sem.academic_year_label) AS academic_years_covered
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-LEFT JOIN dbo.ACADEMIC_SEMESTER AS sem
-    ON CONVERT(DATE, br.requested_start_time) >= sem.semester_start_date
-   AND CONVERT(DATE, br.requested_start_time) < sem.semester_end_date
-   AND sem.semester_code LIKE @run_prefix + N'-%'
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND br.requested_start_time >= CONVERT(DATETIME2(0), @base_date);
-
-PRINT 'Validation 2: booking counts by status.';
-SELECT
-    bs.status_code,
-    COUNT(*) AS booking_count
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.BOOKING_STATUS AS bs ON bs.booking_status_id = br.booking_status_id
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-GROUP BY bs.status_code
-ORDER BY bs.status_code;
-
-PRINT 'Validation 3: booking counts by generated semester.';
-SELECT
-    sem.academic_year_label,
-    sem.semester_name,
-    COUNT(br.booking_request_id) AS booking_count
-FROM dbo.ACADEMIC_SEMESTER AS sem
-LEFT JOIN dbo.BOOKING_REQUEST AS br
-    ON CONVERT(DATE, br.requested_start_time) >= sem.semester_start_date
-   AND CONVERT(DATE, br.requested_start_time) < sem.semester_end_date
-LEFT JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE sem.semester_code LIKE @run_prefix + N'-%'
-  AND (s.unique_space_code LIKE @run_prefix + N'-SPACE-%' OR br.booking_request_id IS NULL)
-GROUP BY sem.academic_year_label, sem.semester_name, sem.semester_start_date
-ORDER BY sem.semester_start_date;
-
-PRINT 'Validation 4: booking counts by purpose.';
-SELECT
-    br.purpose_of_use,
-    COUNT(*) AS booking_count
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-GROUP BY br.purpose_of_use
-ORDER BY br.purpose_of_use;
-
-PRINT 'Validation 5: booking counts by space.';
-SELECT
-    s.unique_space_code,
-    COUNT(*) AS booking_count
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-GROUP BY s.unique_space_code
-ORDER BY s.unique_space_code;
-
-PRINT 'Validation 6: generated relation orphan checks. Expected orphan_count = 0 for all rows.';
-SELECT N'BOOKING_REQUEST.requester_user_account_id' AS check_name, COUNT(*) AS orphan_count
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-LEFT JOIN dbo.USER_ACCOUNT AS ua ON ua.user_account_id = br.requester_user_account_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND ua.user_account_id IS NULL
-UNION ALL
-SELECT N'APPROVAL_DECISION.booking_request_id', COUNT(*)
-FROM dbo.APPROVAL_DECISION AS ad
-LEFT JOIN dbo.BOOKING_REQUEST AS br ON br.booking_request_id = ad.booking_request_id
-LEFT JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND br.booking_request_id IS NULL
-UNION ALL
-SELECT N'USAGE_SESSION.booking_request_id', COUNT(*)
-FROM dbo.USAGE_SESSION AS us
-LEFT JOIN dbo.BOOKING_REQUEST AS br ON br.booking_request_id = us.booking_request_id
-LEFT JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND br.booking_request_id IS NULL
-UNION ALL
-SELECT N'MAINTENANCE_RECORD.space_id', COUNT(*)
-FROM dbo.MAINTENANCE_RECORD AS mr
-LEFT JOIN dbo.SPACE AS s ON s.space_id = mr.space_id
-WHERE mr.problem_description LIKE @run_prefix + N'%'
-  AND s.space_id IS NULL
-UNION ALL
-SELECT N'BOOKING_ADVISORY_ACKNOWLEDGEMENT.booking_or_maintenance', COUNT(*)
-FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT AS baa
-LEFT JOIN dbo.BOOKING_REQUEST AS br ON br.booking_request_id = baa.booking_request_id
-LEFT JOIN dbo.MAINTENANCE_RECORD AS mr ON mr.maintenance_record_id = baa.maintenance_record_id
-LEFT JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE (s.unique_space_code LIKE @run_prefix + N'-SPACE-%' OR mr.problem_description LIKE @run_prefix + N'%')
-  AND (br.booking_request_id IS NULL OR mr.maintenance_record_id IS NULL);
-
-PRINT 'Validation 7: duplicate generated natural/business keys. Expected duplicate_count = 0.';
-SELECT N'USER_ACCOUNT.user_id' AS check_name, COUNT(*) AS duplicate_count
-FROM (
-    SELECT user_id
-    FROM dbo.USER_ACCOUNT
-    WHERE user_id LIKE @run_prefix + N'-%'
-    GROUP BY user_id
-    HAVING COUNT(*) > 1
-) AS d
-UNION ALL
-SELECT N'SPACE.unique_space_code', COUNT(*)
-FROM (
-    SELECT unique_space_code
-    FROM dbo.SPACE
-    WHERE unique_space_code LIKE @run_prefix + N'-%'
-    GROUP BY unique_space_code
-    HAVING COUNT(*) > 1
-) AS d
-UNION ALL
-SELECT N'BOOKING_ADVISORY_ACKNOWLEDGEMENT.booking_maintenance', COUNT(*)
-FROM (
-    SELECT booking_request_id, maintenance_record_id
-    FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT
-    GROUP BY booking_request_id, maintenance_record_id
-    HAVING COUNT(*) > 1
-) AS d;
-
-PRINT 'Validation 8: time-order checks. Expected invalid_count = 0.';
-SELECT N'BOOKING_REQUEST requested interval' AS check_name, COUNT(*) AS invalid_count
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND br.requested_end_time <= br.requested_start_time
-UNION ALL
-SELECT N'USAGE_SESSION actual interval', COUNT(*)
-FROM dbo.USAGE_SESSION AS us
-INNER JOIN dbo.BOOKING_REQUEST AS br ON br.booking_request_id = us.booking_request_id
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND us.actual_end_time IS NOT NULL
-  AND us.actual_end_time <= us.actual_start_time
-UNION ALL
-SELECT N'MAINTENANCE_RECORD interval', COUNT(*)
-FROM dbo.MAINTENANCE_RECORD AS mr
-WHERE mr.problem_description LIKE @run_prefix + N'%'
-  AND mr.completion_time IS NOT NULL
-  AND mr.completion_time <= mr.start_time;
-
-PRINT 'Validation 9: approved booking overlap. Expected approved_overlap_pair_count = 0.';
-SELECT
-    COUNT(*) AS approved_overlap_pair_count
-FROM dbo.BOOKING_REQUEST AS a
-INNER JOIN dbo.BOOKING_STATUS AS ast ON ast.booking_status_id = a.booking_status_id
-INNER JOIN dbo.SPACE AS s ON s.space_id = a.space_id
-INNER JOIN dbo.BOOKING_REQUEST AS b ON b.booking_request_id > a.booking_request_id AND b.space_id = a.space_id
-INNER JOIN dbo.BOOKING_STATUS AS bst ON bst.booking_status_id = b.booking_status_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND ast.status_code IN (N'approved', N'checked_in', N'completed')
-  AND bst.status_code IN (N'approved', N'checked_in', N'completed')
-  AND a.requested_start_time < b.requested_end_time
-  AND a.requested_end_time > b.requested_start_time;
-
-PRINT 'Validation 10: approved booking versus out-of-service maintenance overlap. Unlabelled overlap expected 0.';
-WITH oos_overlaps AS (
-    SELECT
-        br.booking_request_id,
-        mr.maintenance_record_id,
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM dbo.MAINTENANCE_IMPACT_EVENT AS mie
-                INNER JOIN dbo.MAINTENANCE_IMPACT_LEVEL AS oldmil ON oldmil.impact_level_id = mie.old_impact_level_id
-                INNER JOIN dbo.MAINTENANCE_IMPACT_LEVEL AS newmil ON newmil.impact_level_id = mie.new_impact_level_id
-                WHERE mie.maintenance_record_id = mr.maintenance_record_id
-                  AND oldmil.impact_level_code = N'advisory'
-                  AND newmil.impact_level_code = N'out_of_service'
-                  AND mie.change_note LIKE N'Generated advisory-to-out-of-service later escalation%'
-            )
-            THEN 1 ELSE 0
-        END AS is_labelled_later_escalation
-    FROM dbo.BOOKING_REQUEST AS br
-    INNER JOIN dbo.BOOKING_STATUS AS bs ON bs.booking_status_id = br.booking_status_id
-    INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-    INNER JOIN dbo.MAINTENANCE_RECORD AS mr
-        ON mr.space_id = br.space_id
-       AND mr.start_time < br.requested_end_time
-       AND ISNULL(mr.completion_time, CONVERT(DATETIME2(0), '9999-12-31T23:59:59')) > br.requested_start_time
-    INNER JOIN dbo.MAINTENANCE_IMPACT_LEVEL AS mil ON mil.impact_level_id = mr.impact_level_id
-    WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-      AND mr.problem_description LIKE @run_prefix + N'%'
-      AND bs.status_code IN (N'approved', N'checked_in', N'completed')
-      AND mil.impact_level_code = N'out_of_service'
+/* Direct bulk load and cleanup/regeneration can leave stale optimizer statistics.
+   Refresh them before correctness checks and before handing the dataset to tuning. */
+UPDATE STATISTICS dbo.BOOKING_REQUEST WITH FULLSCAN;
+UPDATE STATISTICS dbo.APPROVAL_DECISION WITH FULLSCAN;
+UPDATE STATISTICS dbo.USAGE_SESSION WITH FULLSCAN;
+UPDATE STATISTICS dbo.MAINTENANCE_RECORD WITH FULLSCAN;
+UPDATE STATISTICS dbo.MAINTENANCE_IMPACT_EVENT WITH FULLSCAN;
+UPDATE STATISTICS dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT WITH FULLSCAN;
+DECLARE @Errors TABLE(check_name NVARCHAR(100),error_count BIGINT);
+DECLARE @Generated BIGINT=(SELECT COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id WHERE u.user_id LIKE N'G03-GEN-U-%');
+SELECT d.booking_request_id,
+       SUM(CASE WHEN outcome.status_code=N'approved' THEN 1 ELSE 0 END) approved_count,
+       SUM(CASE WHEN outcome.status_code=N'rejected' THEN 1 ELSE 0 END) rejected_count,
+       SUM(CASE WHEN outcome.status_code=N'rejected' AND NULLIF(LTRIM(RTRIM(d.rejection_reason)),N'') IS NOT NULL THEN 1 ELSE 0 END) valid_rejection_count,
+       CONVERT(DATETIME2(0),NULL) first_approved_at
+INTO #DecisionSummary
+FROM dbo.APPROVAL_DECISION d JOIN dbo.BOOKING_STATUS outcome ON outcome.booking_status_id=d.decision_outcome_booking_status_id
+GROUP BY d.booking_request_id;
+CREATE UNIQUE CLUSTERED INDEX IX_G03_validation_decision_summary ON #DecisionSummary(booking_request_id);
+UPDATE ds SET first_approved_at=approved_history.first_approved_at
+FROM #DecisionSummary ds JOIN(
+ SELECT d.booking_request_id,MIN(d.decision_time) first_approved_at
+ FROM dbo.APPROVAL_DECISION d JOIN dbo.BOOKING_STATUS outcome ON outcome.booking_status_id=d.decision_outcome_booking_status_id
+ WHERE outcome.status_code=N'approved' GROUP BY d.booking_request_id
+)approved_history ON approved_history.booking_request_id=ds.booking_request_id;
+INSERT @Errors VALUES(N'booking_count_below_100000',CASE WHEN @Generated<100000 THEN 1 ELSE 0 END);
+INSERT @Errors SELECT N'academic_year_coverage_below_3',CASE WHEN COUNT(DISTINCT CASE WHEN MONTH(b.requested_start_time)>=9 THEN YEAR(b.requested_start_time) ELSE YEAR(b.requested_start_time)-1 END)<3 THEN 1 ELSE 0 END FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id WHERE u.user_id LIKE N'G03-GEN-U-%';
+INSERT @Errors SELECT N'semester_date_band_coverage_below_6',CASE WHEN COUNT(DISTINCT CONCAT(CASE WHEN MONTH(b.requested_start_time)>=9 THEN YEAR(b.requested_start_time) ELSE YEAR(b.requested_start_time)-1 END,N'-',CASE WHEN MONTH(b.requested_start_time)>=9 THEN N'fall' ELSE N'spring' END))<6 THEN 1 ELSE 0 END FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id WHERE u.user_id LIKE N'G03-GEN-U-%';
+INSERT @Errors SELECT N'invalid_time_order',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND b.requested_end_time<=b.requested_start_time;
+INSERT @Errors SELECT N'participant_exceeds_space_capacity',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.SPACE s ON s.space_id=b.space_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND b.expected_number_of_participants>s.capacity;
+;WITH occupancy AS(
+ SELECT b.booking_request_id,b.space_id,b.requested_start_time,b.requested_end_time
+ FROM dbo.BOOKING_REQUEST b JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id
+ WHERE u.user_id LIKE N'G03-GEN-U-%' AND bs.status_code IN(N'approved',N'checked_in')
+), ordered AS(
+ SELECT *,MAX(requested_end_time) OVER(PARTITION BY space_id ORDER BY requested_start_time,booking_request_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) prior_max_end
+ FROM occupancy
 )
-SELECT
-    is_labelled_later_escalation,
-    COUNT(*) AS approved_oos_overlap_count
-FROM oos_overlaps
-GROUP BY is_labelled_later_escalation
-ORDER BY is_labelled_later_escalation;
-
-PRINT 'Validation 11: advisory acknowledgement coverage. Expected missing_acknowledgement_count = 0.';
-SELECT
-    COUNT(*) AS missing_acknowledgement_count
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.BOOKING_STATUS AS bs ON bs.booking_status_id = br.booking_status_id
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-INNER JOIN dbo.MAINTENANCE_RECORD AS mr
-    ON mr.space_id = br.space_id
-   AND mr.start_time < br.requested_end_time
-   AND ISNULL(mr.completion_time, CONVERT(DATETIME2(0), '9999-12-31T23:59:59')) > br.requested_start_time
-INNER JOIN dbo.MAINTENANCE_IMPACT_LEVEL AS mil ON mil.impact_level_id = mr.impact_level_id
-LEFT JOIN dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT AS baa
-    ON baa.booking_request_id = br.booking_request_id
-   AND baa.maintenance_record_id = mr.maintenance_record_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND mr.problem_description LIKE @run_prefix + N' advisory maintenance %'
-  AND bs.status_code IN (N'approved', N'checked_in', N'completed')
-  AND mil.impact_level_code = N'advisory'
-  AND baa.advisory_acknowledgement_id IS NULL;
-
-PRINT 'Validation 12: duplicate acknowledgement pairs/events. Expected duplicate_count = 0.';
-SELECT N'acknowledgement pair duplicates' AS check_name, COUNT(*) AS duplicate_count
-FROM (
-    SELECT baa.booking_request_id, baa.maintenance_record_id
-    FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT AS baa
-    INNER JOIN dbo.BOOKING_REQUEST AS br ON br.booking_request_id = baa.booking_request_id
-    INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-    WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-    GROUP BY baa.booking_request_id, baa.maintenance_record_id
-    HAVING COUNT(*) > 1
-) AS d
-UNION ALL
-SELECT N'impact event exact duplicates', COUNT(*)
-FROM (
-    SELECT maintenance_record_id, old_impact_level_id, new_impact_level_id, changed_at
-    FROM dbo.MAINTENANCE_IMPACT_EVENT
-    GROUP BY maintenance_record_id, old_impact_level_id, new_impact_level_id, changed_at
-    HAVING COUNT(*) > 1
-) AS d;
-
-PRINT 'Validation 13: maintenance impact current-state consistency. Expected mismatch_count = 0.';
-WITH latest_event AS (
-    SELECT
-        mie.maintenance_record_id,
-        mie.new_impact_level_id,
-        ROW_NUMBER() OVER (
-            PARTITION BY mie.maintenance_record_id
-            ORDER BY mie.changed_at DESC, mie.maintenance_impact_event_id DESC
-        ) AS rn
-    FROM dbo.MAINTENANCE_IMPACT_EVENT AS mie
-    INNER JOIN dbo.MAINTENANCE_RECORD AS mr ON mr.maintenance_record_id = mie.maintenance_record_id
-    WHERE mr.problem_description LIKE @run_prefix + N'%'
+INSERT @Errors SELECT N'approved_overlap_violations',COUNT_BIG(*) FROM ordered WHERE prior_max_end>requested_start_time;
+;WITH escalations AS(
+ SELECT e.maintenance_record_id,MAX(e.changed_at) escalated_at
+ FROM dbo.MAINTENANCE_IMPACT_EVENT e JOIN dbo.MAINTENANCE_IMPACT_LEVEL oi ON oi.impact_level_id=e.old_impact_level_id JOIN dbo.MAINTENANCE_IMPACT_LEVEL ni ON ni.impact_level_id=e.new_impact_level_id
+ WHERE oi.impact_level_code=N'advisory' AND ni.impact_level_code=N'out_of_service' GROUP BY e.maintenance_record_id
 )
-SELECT
-    COUNT(*) AS mismatch_count
-FROM dbo.MAINTENANCE_RECORD AS mr
-LEFT JOIN latest_event AS le
-    ON le.maintenance_record_id = mr.maintenance_record_id
-   AND le.rn = 1
-WHERE mr.problem_description LIKE @run_prefix + N'%'
-  AND (le.maintenance_record_id IS NULL OR le.new_impact_level_id <> mr.impact_level_id);
+INSERT @Errors SELECT N'unexplained_active_oos_overlap',COUNT_BIG(*)
+FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN #DecisionSummary ds ON ds.booking_request_id=b.booking_request_id AND ds.approved_count>0
+JOIN dbo.MAINTENANCE_RECORD m ON m.space_id=b.space_id JOIN dbo.MAINTENANCE_STATUS ms ON ms.maintenance_status_id=m.maintenance_status_id JOIN dbo.MAINTENANCE_IMPACT_LEVEL i ON i.impact_level_id=m.impact_level_id
+LEFT JOIN escalations esc ON esc.maintenance_record_id=m.maintenance_record_id
+WHERE u.user_id LIKE N'G03-GEN-U-%' AND ms.status_name IN(N'Reported',N'In progress') AND i.impact_level_code=N'out_of_service'
+  AND b.requested_start_time<COALESCE(m.completion_time,CONVERT(DATETIME2(0),'9999-12-31')) AND b.requested_end_time>CASE WHEN esc.escalated_at>m.start_time THEN esc.escalated_at ELSE m.start_time END
+  AND (esc.escalated_at IS NULL OR ds.first_approved_at>esc.escalated_at)
+OPTION(HASH JOIN,RECOMPILE);
+INSERT @Errors SELECT N'missing_active_advisory_ack',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.MAINTENANCE_RECORD m ON m.space_id=b.space_id AND m.start_time<b.requested_end_time AND COALESCE(m.completion_time,CONVERT(DATETIME2(0),'9999-12-31'))>b.requested_start_time JOIN dbo.MAINTENANCE_STATUS ms ON ms.maintenance_status_id=m.maintenance_status_id JOIN dbo.MAINTENANCE_IMPACT_LEVEL i ON i.impact_level_id=m.impact_level_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND ms.status_name IN(N'Reported',N'In progress') AND i.impact_level_code=N'advisory' AND NOT EXISTS(SELECT 1 FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT a WHERE a.booking_request_id=b.booking_request_id AND a.maintenance_record_id=m.maintenance_record_id);
+INSERT @Errors SELECT N'missing_escalated_advisory_ack',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.MAINTENANCE_RECORD m ON m.space_id=b.space_id AND m.start_time<b.requested_end_time AND COALESCE(m.completion_time,CONVERT(DATETIME2(0),'9999-12-31'))>b.requested_start_time CROSS APPLY(SELECT TOP(1)e.changed_at FROM dbo.MAINTENANCE_IMPACT_EVENT e JOIN dbo.MAINTENANCE_IMPACT_LEVEL oi ON oi.impact_level_id=e.old_impact_level_id JOIN dbo.MAINTENANCE_IMPACT_LEVEL ni ON ni.impact_level_id=e.new_impact_level_id WHERE e.maintenance_record_id=m.maintenance_record_id AND oi.impact_level_code=N'advisory' AND ni.impact_level_code=N'out_of_service' ORDER BY e.changed_at,e.maintenance_impact_event_id)esc WHERE u.user_id LIKE N'G03-GEN-U-%' AND DATEADD(DAY,-30,b.requested_start_time)<esc.changed_at AND NOT EXISTS(SELECT 1 FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT a WHERE a.booking_request_id=b.booking_request_id AND a.maintenance_record_id=m.maintenance_record_id);
+INSERT @Errors SELECT N'duplicate_ack_pair',COUNT_BIG(*) FROM(SELECT booking_request_id,maintenance_record_id FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT GROUP BY booking_request_id,maintenance_record_id HAVING COUNT(*)>1)d;
+INSERT @Errors SELECT N'impact_latest_missing_or_mismatch',COUNT_BIG(*) FROM dbo.MAINTENANCE_RECORD m OUTER APPLY(SELECT TOP(1)e.new_impact_level_id FROM dbo.MAINTENANCE_IMPACT_EVENT e WHERE e.maintenance_record_id=m.maintenance_record_id ORDER BY e.changed_at DESC,e.maintenance_impact_event_id DESC)x WHERE m.problem_description LIKE N'G03-GEN-V2:%' AND (x.new_impact_level_id IS NULL OR x.new_impact_level_id<>m.impact_level_id);
+INSERT @Errors SELECT N'active_maintenance_has_completion',COUNT_BIG(*) FROM dbo.MAINTENANCE_RECORD m JOIN dbo.MAINTENANCE_STATUS ms ON ms.maintenance_status_id=m.maintenance_status_id WHERE m.problem_description LIKE N'G03-GEN-V2:%' AND ms.status_name IN(N'Reported',N'In progress') AND (m.completion_time IS NOT NULL OR m.result_note IS NOT NULL);
+INSERT @Errors SELECT N'completed_maintenance_missing_completion',COUNT_BIG(*) FROM dbo.MAINTENANCE_RECORD m JOIN dbo.MAINTENANCE_STATUS ms ON ms.maintenance_status_id=m.maintenance_status_id WHERE m.problem_description LIKE N'G03-GEN-V2:%' AND ms.status_name=N'Completed' AND (m.completion_time IS NULL OR m.result_note IS NULL);
+INSERT @Errors SELECT N'maintenance_count_not_100',CASE WHEN COUNT_BIG(*)=100 THEN 0 ELSE 1 END FROM dbo.MAINTENANCE_RECORD m WHERE m.problem_description LIKE N'G03-GEN-V2:%';
+INSERT @Errors SELECT N'escalation_population_below_10',CASE WHEN COUNT_BIG(*)>=10 THEN 0 ELSE 1 END FROM dbo.MAINTENANCE_IMPACT_EVENT e JOIN dbo.MAINTENANCE_RECORD m ON m.maintenance_record_id=e.maintenance_record_id JOIN dbo.MAINTENANCE_IMPACT_LEVEL oi ON oi.impact_level_id=e.old_impact_level_id JOIN dbo.MAINTENANCE_IMPACT_LEVEL ni ON ni.impact_level_id=e.new_impact_level_id WHERE m.problem_description LIKE N'G03-GEN-V2:%' AND oi.impact_level_code=N'advisory' AND ni.impact_level_code=N'out_of_service';
+INSERT @Errors SELECT N'acknowledgement_population_missing',CASE WHEN COUNT_BIG(*)>0 THEN 0 ELSE 1 END FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT a JOIN dbo.MAINTENANCE_RECORD m ON m.maintenance_record_id=a.maintenance_record_id WHERE m.problem_description LIKE N'G03-GEN-V2:%';
+INSERT @Errors SELECT N'missing_required_status_population',COUNT_BIG(*) FROM(VALUES(N'approved'),(N'checked_in'),(N'completed'),(N'pending'),(N'rejected'),(N'cancelled'),(N'no_show')) required(status_code) WHERE NOT EXISTS(SELECT 1 FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND bs.status_code=required.status_code);
+INSERT @Errors SELECT N'insufficient_purpose_diversity',CASE WHEN COUNT(DISTINCT b.purpose_of_use)<7 THEN 1 ELSE 0 END FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id WHERE u.user_id LIKE N'G03-GEN-U-%';
+INSERT @Errors SELECT N'insufficient_space_diversity',CASE WHEN COUNT(DISTINCT s.space_type)<4 OR COUNT(DISTINCT s.capacity)<4 THEN 1 ELSE 0 END FROM dbo.SPACE s WHERE s.unique_space_code LIKE N'G03-GEN-S-%';
+INSERT @Errors SELECT N'space_without_status_diversity',COUNT_BIG(*) FROM(SELECT b.space_id FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id WHERE u.user_id LIKE N'G03-GEN-U-%' GROUP BY b.space_id HAVING COUNT(DISTINCT bs.status_code)<7)x;
+INSERT @Errors SELECT N'missing_approved_history',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id LEFT JOIN #DecisionSummary ds ON ds.booking_request_id=b.booking_request_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND bs.status_code IN(N'approved',N'checked_in',N'completed',N'no_show') AND COALESCE(ds.approved_count,0)=0;
+INSERT @Errors SELECT N'generated_decision_time_invalid',COUNT_BIG(*) FROM dbo.APPROVAL_DECISION d JOIN dbo.BOOKING_REQUEST b ON b.booking_request_id=d.booking_request_id JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND d.decision_time<>DATEADD(DAY,-30,b.requested_start_time);
+INSERT @Errors SELECT N'generated_decision_actor_invalid',COUNT_BIG(*)
+FROM dbo.APPROVAL_DECISION d JOIN dbo.BOOKING_REQUEST b ON b.booking_request_id=d.booking_request_id JOIN dbo.USER_ACCOUNT requester ON requester.user_account_id=b.requester_user_account_id
+JOIN dbo.SPACE s ON s.space_id=b.space_id LEFT JOIN dbo.INSTANT_APPROVAL_SPACE_TYPE iast ON iast.space_type=s.space_type
+JOIN dbo.BOOKING_STATUS outcome ON outcome.booking_status_id=d.decision_outcome_booking_status_id JOIN dbo.USER_ACCOUNT actor ON actor.user_account_id=d.decided_by_user_account_id JOIN dbo.ROLE r ON r.role_id=actor.role_id JOIN dbo.ACCOUNT_STATUS acs ON acs.account_status_id=actor.account_status_id
+WHERE requester.user_id LIKE N'G03-GEN-U-%' AND (
+ (outcome.status_code=N'approved' AND iast.instant_approval_space_type_id IS NOT NULL AND b.expected_number_of_participants<=s.capacity AND NOT(r.role_name=N'System' AND acs.status_name=N'Active'))
+ OR (outcome.status_code=N'approved' AND (iast.instant_approval_space_type_id IS NULL OR b.expected_number_of_participants>s.capacity) AND NOT(r.role_name IN(N'facility staff',N'facility manager') AND acs.status_name=N'Active'))
+ OR (outcome.status_code=N'rejected' AND NOT(r.role_name IN(N'facility staff',N'facility manager') AND acs.status_name=N'Active')));
+INSERT @Errors SELECT N'generated_decision_cardinality_invalid',COUNT_BIG(*)
+FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id LEFT JOIN #DecisionSummary ds ON ds.booking_request_id=b.booking_request_id
+WHERE u.user_id LIKE N'G03-GEN-U-%' AND ((bs.status_code IN(N'approved',N'checked_in',N'completed',N'no_show') AND (COALESCE(ds.approved_count,0)<>1 OR COALESCE(ds.rejected_count,0)<>0)) OR (bs.status_code=N'rejected' AND (COALESCE(ds.approved_count,0)<>0 OR COALESCE(ds.rejected_count,0)<>1)) OR (bs.status_code IN(N'pending',N'cancelled') AND (COALESCE(ds.approved_count,0)<>0 OR COALESCE(ds.rejected_count,0)<>0)));
+INSERT @Errors SELECT N'checked_in_usage_lifecycle_invalid',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id LEFT JOIN dbo.USAGE_SESSION s ON s.booking_request_id=b.booking_request_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND bs.status_code=N'checked_in' AND (s.usage_session_id IS NULL OR s.actual_end_time IS NOT NULL OR s.completed_by_user_account_id IS NOT NULL OR s.final_condition_of_space IS NOT NULL);
+INSERT @Errors SELECT N'completed_usage_lifecycle_invalid',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id LEFT JOIN dbo.USAGE_SESSION s ON s.booking_request_id=b.booking_request_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND bs.status_code=N'completed' AND (s.usage_session_id IS NULL OR s.actual_end_time IS NULL OR s.completed_by_user_account_id IS NULL OR s.final_condition_of_space IS NULL);
+INSERT @Errors SELECT N'no_show_usage_or_approval_invalid',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id LEFT JOIN dbo.USAGE_SESSION s ON s.booking_request_id=b.booking_request_id LEFT JOIN #DecisionSummary ds ON ds.booking_request_id=b.booking_request_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND bs.status_code=N'no_show' AND (s.usage_session_id IS NOT NULL OR COALESCE(ds.approved_count,0)=0);
+INSERT @Errors SELECT N'rejected_decision_invalid',COUNT_BIG(*) FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id LEFT JOIN #DecisionSummary ds ON ds.booking_request_id=b.booking_request_id WHERE u.user_id LIKE N'G03-GEN-U-%' AND bs.status_code=N'rejected' AND COALESCE(ds.valid_rejection_count,0)=0;
 
-PRINT 'Validation 14: DBCC CHECKCONSTRAINTS for generated tables. Empty result set means no reported constraint violations.';
+SELECT check_name,error_count,CASE WHEN error_count=0 THEN N'PASS' ELSE N'FAIL' END result FROM @Errors ORDER BY check_name;
+SELECT bs.status_code,COUNT_BIG(*) booking_count FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id WHERE u.user_id LIKE N'G03-GEN-U-%' GROUP BY bs.status_code ORDER BY bs.status_code;
+SELECT CASE WHEN MONTH(b.requested_start_time)>=9 THEN YEAR(b.requested_start_time) ELSE YEAR(b.requested_start_time)-1 END academic_year_start,COUNT_BIG(*) booking_count FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id WHERE u.user_id LIKE N'G03-GEN-U-%' GROUP BY CASE WHEN MONTH(b.requested_start_time)>=9 THEN YEAR(b.requested_start_time) ELSE YEAR(b.requested_start_time)-1 END ORDER BY academic_year_start;
 DBCC CHECKCONSTRAINTS WITH ALL_CONSTRAINTS;
+IF EXISTS(SELECT 1 FROM @Errors WHERE error_count<>0) THROW 52430,'Generated-data validation failed.',1;
+SELECT N'PASS' validation_status,@Generated generated_booking_count;
