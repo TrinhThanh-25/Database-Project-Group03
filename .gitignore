@@ -10,3 +10,5 @@
 
 # OpenCode inner config (self-managed, not needed in repo)
 .opencode/.gitignore
+/report
+current-task.md
