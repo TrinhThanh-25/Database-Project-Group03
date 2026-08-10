@@ -214,7 +214,7 @@ SELECT
     sp.unique_space_code,
     sp.space_name,
     sp.building,
-    COUNT(br.booking_request_id) AS confirmed_bookings
+    COUNT(bs.booking_status_id) AS confirmed_bookings
 FROM dbo.SPACE AS sp
     LEFT JOIN dbo.BOOKING_REQUEST AS br ON br.space_id = sp.space_id
     LEFT JOIN dbo.BOOKING_STATUS AS bs ON bs.booking_status_id = br.booking_status_id
@@ -223,9 +223,9 @@ GROUP BY sp.unique_space_code, sp.space_name, sp.building
 ORDER BY confirmed_bookings DESC;
 
 -- Query 12: Pending bookings awaiting approval
--- Business question: Which booking requests are currently pending and need a decision, ordered by how long they have waited?
+-- Business question: Which booking requests are currently pending and need a decision, ordered by the earliest requested start time?
 -- Target user(s): Facility staff, facility manager
--- Why this query is useful: Gives approvers a prioritized worklist of outstanding requests so none are left unreviewed for too long.
+-- Why this query is useful: Gives approvers a worklist prioritized by the nearest scheduled use; the schema has no request-submission timestamp, so waiting duration cannot be calculated.
 SELECT
     br.booking_request_id,
     requester.full_name AS requester_name,
@@ -292,7 +292,7 @@ WHERE sp.unique_space_code = N'MR-405'
 ORDER BY f.facility_name ASC;
 
 -- Query 16: Cancelled bookings in a given period
--- Business question: Which bookings were cancelled, and for spaces in which buildings?
+-- Business question: Which bookings scheduled in calendar year 2026 were cancelled, and for spaces in which buildings?
 -- Target user(s): Facility manager
 -- Why this query is useful: Tracks cancellation patterns by building/space, which can reveal scheduling friction or spaces that are frequently over-reserved and dropped.
 SELECT
@@ -307,9 +307,11 @@ FROM dbo.BOOKING_REQUEST AS br
     INNER JOIN dbo.USER_ACCOUNT AS requester ON requester.user_account_id = br.requester_user_account_id
     INNER JOIN dbo.SPACE AS sp ON sp.space_id = br.space_id
 WHERE bs.status_name = N'Cancelled'
+  AND br.requested_start_time >= '2026-01-01T00:00:00'
+  AND br.requested_start_time <  '2027-01-01T00:00:00'
 ORDER BY br.requested_start_time DESC;
 
--- Query 17: Department administrator view of pending departmental headcount
+-- Query 17: Department administrator view of active departmental headcount
 -- Business question: How many active user accounts, broken down by role, does each department currently have?
 -- Target user(s): Department administrator
 -- Why this query is useful: Gives a department administrator a quick roster summary by role, useful for planning department-wide space needs and verifying account status hygiene.

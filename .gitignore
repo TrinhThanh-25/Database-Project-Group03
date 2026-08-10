@@ -10,3 +10,7 @@
 
 # OpenCode inner config (self-managed, not needed in repo)
 .opencode/.gitignore
+/report
+current-task.md
+
+Report_Database_Project_Phase2/

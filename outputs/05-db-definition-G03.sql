@@ -116,6 +116,10 @@
 -- ============================================================================
 -- Drop block (idempotent re-run), reverse dependency order
 -- ============================================================================
+-- Break the only circular dependency before dropping USER_ACCOUNT.
+IF OBJECT_ID(N'dbo.DEPARTMENT', N'U') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.DEPARTMENT') AND name=N'FK_DEPARTMENT_head_user_account_id')
+    ALTER TABLE dbo.DEPARTMENT DROP CONSTRAINT FK_DEPARTMENT_head_user_account_id;
 IF OBJECT_ID(N'dbo.MAINTENANCE_RECORD', N'U') IS NOT NULL DROP TABLE dbo.MAINTENANCE_RECORD;
 IF OBJECT_ID(N'dbo.MAINTENANCE_STATUS', N'U') IS NOT NULL DROP TABLE dbo.MAINTENANCE_STATUS;
 IF OBJECT_ID(N'dbo.USAGE_SESSION', N'U') IS NOT NULL DROP TABLE dbo.USAGE_SESSION;

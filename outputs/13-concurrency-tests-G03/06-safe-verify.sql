@@ -1,0 +1,3 @@
+DECLARE @Pairs INT=(SELECT COUNT(*) FROM dbo.BOOKING_REQUEST a JOIN dbo.BOOKING_STATUS sa ON sa.booking_status_id=a.booking_status_id JOIN dbo.BOOKING_REQUEST b ON b.space_id=a.space_id AND b.booking_request_id>a.booking_request_id JOIN dbo.BOOKING_STATUS sb ON sb.booking_status_id=b.booking_status_id JOIN dbo.SPACE s ON s.space_id=a.space_id WHERE s.unique_space_code IN(N'G03-CT-II',N'G03-CT-IS',N'G03-CT-SS') AND sa.status_code IN(N'approved',N'checked_in') AND sb.status_code IN(N'approved',N'checked_in') AND a.requested_start_time<b.requested_end_time AND a.requested_end_time>b.requested_start_time);
+IF @Pairs<>0 THROW 52323,'Protected path left an overlapping approved pair.',1;
+SELECT @Pairs AS safe_overlap_pairs,N'PASS' AS result;

@@ -1,0 +1,14 @@
+SET NOCOUNT ON; SET XACT_ABORT ON;
+DECLARE @Spaces TABLE(id INT PRIMARY KEY); INSERT @Spaces SELECT space_id FROM dbo.SPACE WHERE unique_space_code LIKE N'G03-GEN-S-%';
+DELETE a FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT a JOIN dbo.BOOKING_REQUEST b ON b.booking_request_id=a.booking_request_id WHERE b.space_id IN(SELECT id FROM @Spaces);
+DELETE d FROM dbo.APPROVAL_DECISION d JOIN dbo.BOOKING_REQUEST b ON b.booking_request_id=d.booking_request_id WHERE b.space_id IN(SELECT id FROM @Spaces);
+DELETE us FROM dbo.USAGE_SESSION us JOIN dbo.BOOKING_REQUEST b ON b.booking_request_id=us.booking_request_id WHERE b.space_id IN(SELECT id FROM @Spaces);
+DELETE e FROM dbo.MAINTENANCE_IMPACT_EVENT e JOIN dbo.MAINTENANCE_RECORD m ON m.maintenance_record_id=e.maintenance_record_id WHERE m.space_id IN(SELECT id FROM @Spaces);
+DELETE FROM dbo.BOOKING_REQUEST WHERE space_id IN(SELECT id FROM @Spaces);
+DELETE FROM dbo.MAINTENANCE_RECORD WHERE space_id IN(SELECT id FROM @Spaces);
+DELETE sf FROM dbo.SPACE_FACILITY sf WHERE sf.space_id IN(SELECT id FROM @Spaces);
+DELETE FROM dbo.SPACE WHERE space_id IN(SELECT id FROM @Spaces);
+DELETE FROM dbo.USER_ACCOUNT WHERE user_id LIKE N'G03-GEN-U-%';
+DELETE FROM dbo.INSTANT_APPROVAL_SPACE_TYPE WHERE space_type=N'g03-gen-instant';
+DELETE FROM dbo.FACILITY WHERE facility_name IN(N'G03-GEN-Projector',N'G03-GEN-Whiteboard');
+SELECT N'PASS' cleanup_status;
