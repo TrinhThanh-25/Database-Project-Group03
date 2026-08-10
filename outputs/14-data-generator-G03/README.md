@@ -1,110 +1,13 @@
-# Phase 2 Large-Scale Data Generator - Group 03
+# Artifact 14 — Deterministic large-data generator
 
-Final status: `NOT EXECUTED`
+Run in order: `00-config.sql`, `01-generate-reference-data.sql`, `02-generate-bookings.sql`, `03-generate-maintenance.sql`, `04-generate-acknowledgements.sql`, then `05-validate-generated-data.sql`. Run `99-cleanup-generated-data.sql` only to remove the `G03-GEN-*` dataset.
 
-Reason: this workspace does not have a SQL Server command-line client, so row counts and validation results are expected results only until the scripts are run in SQL Server.
+Default contract: run ID `G03-GEN-V2`, 120 users, 100 spaces, and exactly 100,000 bookings covering academic-year starts 2027, 2028, and 2029 and both fall/spring date bands in each year (six semesters). The set-based formula assigns a unique 90-minute slot per space/year/semester sequence. Four space types, four capacity bands (30/45/60/90), five descriptive policy variants, and all seven allowed purposes are populated. Status selection uses the booking block rather than the space number, so every generated space receives all seven lifecycle statuses. Participant count never exceeds that space's capacity.
 
-## Purpose
+Lifecycle fixtures are consistent: `approved`, `checked_in`, `completed`, and `no_show` rows have an approved decision exactly thirty days before requested use; `rejected` rows have one staff rejection with a reason; `checked_in` and `completed` have usage sessions in the corresponding open/completed state; `no_show` has no usage session. The dedicated `System` actor is used only when the generated space type is configured for instant approval and participant count is within capacity. All other approvals and every rejection use an active facility staff/manager actor.
 
-This directory contains a deterministic, set-based SQL Server generator for Phase 2 performance testing. It creates reference data, users, spaces, facilities, semesters, at least 100,000 bookings, decisions, usage sessions, maintenance records, impact history, and advisory acknowledgements.
+The generator directly inserts trusted offline benchmark rows for speed. It is not an application write path and the data must not be used until `05` returns zero for every error check and `DBCC CHECKCONSTRAINTS` is clean. Validation refreshes statistics on generated fact tables with `FULLSCAN`; this prevents stale plans after cleanup/regeneration and provides Output 15 with a stable optimizer baseline. Batches of 5,000 are recommended if the classroom instance has a constrained transaction log; the supplied 100,000-row statement is one set-based load.
 
-The generator intentionally uses direct trusted bulk inserts for speed. This is not an application write path and does not replace the artifact 12 concurrency procedures. Generated data may be used for reports and tuning only after `05-validate-generated-data.sql` returns zero invariant violations.
+Maintenance includes active advisories, ten advisory-to-out-of-service escalations with real event timestamps, and completed records. Active `Reported`/`In progress` rows keep `completion_time` and `result_note` NULL; only `Completed` rows carry completion facts. The escalation is placed so affected future bookings were already approved, while any approval after escalation fails validation. Acknowledgements identify individual booking/maintenance pairs; no message, threshold, semester FK, or snapshot is fabricated. All supplied timestamps are deterministic Vietnam-local wall-clock values, consistent with artifacts 09–12 and 16.
 
-## Execution Order
-
-Run from this directory in SQLCMD mode so each script can include `00-config.sql`:
-
-1. `99-cleanup-generated-data.sql`
-2. `01-generate-reference-data.sql`
-3. `02-generate-bookings.sql`
-4. `03-generate-maintenance.sql`
-5. `04-generate-acknowledgements.sql`
-6. `05-validate-generated-data.sql`
-
-Prerequisites:
-
-- `outputs/05-db-definition-G03.sql`
-- `outputs/10-schema-migration-G03.sql`
-- `outputs/12-concurrency-implementation-G03.sql`
-
-## Deterministic Configuration
-
-Defaults in `00-config.sql`:
-
-| Setting | Value |
-| --- | --- |
-| Run prefix | `G03-LS` |
-| Target bookings | `100000` |
-| Requester users | `800` |
-| Staff users | `20` |
-| Spaces | `20` |
-| Facilities | `10` |
-| Base date | `2028-08-19` |
-| Optional batch size | `50000` |
-| Academic years | `2028-2029`, `2029-2030`, `2030-2031` |
-| Semesters | `6` |
-
-The booking target can be increased to `500000` by changing `G03_TARGET_BOOKINGS` in `00-config.sql` before generation.
-
-## Expected Distribution
-
-The status formula is deterministic over the booking sequence:
-
-| Status code | Approximate share |
-| --- | ---: |
-| `completed` | 45% |
-| `approved` | 15% |
-| `checked_in` | 5% |
-| `pending` | 15% |
-| `cancelled` | 8% |
-| `rejected` | 6% |
-| `no_show` | 6% |
-
-Every booking receives a non-overlapping slot for its assigned space. Non-approved rows may coexist in the same generated schedule, but the default formula still assigns unique space/time slots to all generated bookings to keep validation simple and deterministic.
-
-Maintenance target population:
-
-- 300 current advisory records overlapping generated booking slots.
-- 200 current out-of-service records in off-hour windows that do not overlap generated bookings.
-- 100 current out-of-service records labelled as later advisory-to-out-of-service escalations that may overlap already-approved bookings for affected-booking reports.
-
-Advisory acknowledgement population:
-
-- One row per generated approved/checked-in/completed booking and current advisory maintenance record whose intervals overlap.
-- Duplicate booking/maintenance pairs are forbidden by validation.
-
-## Expected Validation
-
-`05-validate-generated-data.sql` returns labelled result sets for:
-
-- booking target and academic-year coverage;
-- counts by status, semester, purpose, and space;
-- generated relation orphan checks;
-- duplicate generated codes/business pairs;
-- time-order checks;
-- approved booking overlap, expected `0`;
-- approved booking versus out-of-service maintenance, split into labelled escalation and unlabelled cases. Unlabelled overlap is expected `0`;
-- advisory acknowledgement coverage, expected missing count `0`;
-- duplicate acknowledgement pairs, expected `0`;
-- maintenance impact current-state consistency, expected mismatch count `0`;
-- `DBCC CHECKCONSTRAINTS` guidance.
-
-## Actual Evidence
-
-Environment: `NOT EXECUTED`
-
-SQL Server version: `NOT EXECUTED`
-
-Run date: `NOT EXECUTED`
-
-Requested booking count: `100000`
-
-Actual booking count: `NOT EXECUTED`
-
-Generation duration: `NOT EXECUTED`
-
-Validation status: `NOT EXECUTED`
-
-## Cleanup
-
-Run `99-cleanup-generated-data.sql` to delete only rows tied to the `G03-LS` generated users, spaces, facilities, semesters, and maintenance descriptions. The cleanup script leaves normal project/sample data and shared lookup rows intact.
+Actual counts, SQL Server environment, duration, and validation output are recorded in `actual-results-2026-08-10.md`. Execution status for the revised schema is **PASS**.

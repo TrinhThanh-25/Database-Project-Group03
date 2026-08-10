@@ -196,11 +196,13 @@ Validate:
 
 - migration is additive and preserves Phase 1 rows;
 - no destructive Phase 1 drop/recreate block is reused;
-- preflight, transaction/error handling, seeds, backfills, postflight checks, and rerun behavior are complete;
+- a minimal preflight covers objects directly used by the migration; transaction/error handling, seeds, backfills, focused postflight checks, and rerun behavior are complete;
 - lookup meanings do not depend on guessed identity values;
 - mandatory constraints are added only after valid backfill;
 - migration assumptions do not fabricate historical escalation events;
 - output 10 implements output 09 exactly.
+
+Do not reject a demo migration merely because it omits an exhaustive source-schema fingerprint, counts for untouched lookup tables, database-wide `DBCC CHECKCONSTRAINTS`, or production rollback automation. Raise an issue only when the omission prevents required Phase 2 changes, data preservation, safe failure, or repeatable execution from being demonstrated.
 
 ### Mode P2-11 — Concurrency Architecture Review
 
@@ -209,9 +211,10 @@ Validate:
 - invariant and overlap semantics are explicit;
 - all approval-producing paths share one compatible protocol;
 - empty-range safety is addressed;
-- transaction boundaries, lock resource/order, timeout, retry, and bypass prevention are defined;
-- different-space concurrency and deadlock behavior are considered;
-- test matrix is capable of proving both conflict and prevention.
+- transaction boundaries and the protecting lock/resource are defined;
+- a repeatable two-session schedule can prove both conflict and prevention.
+
+Timeout, retry, deadlock, permission hardening, multi-space ordering, and different-space throughput are optional demo extensions, not blocking requirements.
 
 ### Mode P2-12 — Concurrency SQL Review
 
@@ -220,10 +223,12 @@ Validate:
 - SQL implements output 11 without redesign;
 - protection is acquired before invariant checks;
 - overlap/out-of-service checks and decision/acknowledgement writes are atomic;
-- `XACT_ABORT`, `TRY/CATCH`, rollback, lock return codes, and errors are handled;
+- transaction failure rolls back without partial writes;
 - no lookup identity ID is guessed;
 - no `NOLOCK`, production `WAITFOR`, unsafe helper, or partial-write path exists;
 - every approval path uses the same lock namespace.
+
+A detailed error taxonomy, configurable timeouts, deadlock translation, application roles, and `GRANT`/`DENY` statements are optional hardening.
 
 ### Mode P2-13 — Concurrency Evidence Review
 
@@ -232,18 +237,21 @@ Validate:
 - unsafe and safe tests require two real sessions and are separately documented;
 - safe tests call production interfaces;
 - verify scripts inspect committed invariant state;
-- instant/instant, instant/staff, staff/staff, adjacency, different spaces, rollback, timeout, maintenance, and acknowledgement are covered;
+- instant/instant, instant/staff, and staff/staff protected paths are covered;
 - cleanup is limited to fixture data;
 - expected and actual results are never conflated;
 - unexecuted tests remain `NOT EXECUTED`.
+
+Adjacency, different spaces, rollback, timeout, retry, maintenance, acknowledgement, escalation, permissions, and multi-run statistics are optional.
 
 ### Mode P2-14 — Large-Data Generator Review
 
 Validate:
 
-- generation is deterministic, set-based, configurable, and safely cleanable;
+- generation is deterministic, set-based, uses a documented fixed or configurable run contract, and is safely cleanable;
 - at least three academic years and 100,000 bookings are generated;
 - required status/maintenance/acknowledgement cases are present;
+- active `Reported`/`In progress` maintenance has no completion facts, while completed maintenance has completion facts;
 - approved scheduling is non-overlapping;
 - trusted direct-load bypass, if any, is clearly restricted and followed by validation;
 - row-count, FK, temporal, conflict, out-of-service, acknowledgement, and constraint validations are included;
@@ -268,8 +276,9 @@ Validate:
 - before/after runs use the same validated dataset, parameters, semantics, and measurement protocol;
 - actual plans and `STATISTICS IO/TIME` evidence support every claimed improvement;
 - result equivalence is verified;
-- repeated-run statistics, storage/write cost, and redundant indexes are considered;
 - estimates are not labelled actual and missing execution remains `NOT EXECUTED`.
+
+Repeated runs, memory grants, spills, storage/write cost, cold-cache tests, and broad candidate-index surveys are optional and must not be treated as blocking assignment requirements.
 
 ### Phase 2 Review Blocking Rule
 

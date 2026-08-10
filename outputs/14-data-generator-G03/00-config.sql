@@ -1,17 +1,6 @@
-/*
- Group 03 Phase 2 large-scale generator configuration.
-
- These are SQLCMD variables. Run the generator scripts in SQLCMD mode.
- Change G03_TARGET_BOOKINGS to 500000 for the optional larger benchmark.
-*/
-
-:setvar G03_RUN_PREFIX "G03-LS"
-:setvar G03_TARGET_BOOKINGS "100000"
-:setvar G03_REQUESTER_COUNT "800"
-:setvar G03_STAFF_COUNT "20"
-:setvar G03_SPACE_COUNT "20"
-:setvar G03_FACILITY_COUNT "10"
-:setvar G03_BASE_DATE "2028-08-19"
-:setvar G03_SLOT_HOURS "2"
-:setvar G03_SLOTS_PER_DAY "4"
-:setvar G03_BATCH_SIZE "50000"
+/* Shared deterministic defaults repeated by each script: run_id G03-GEN-V2,
+   100000 bookings, 120 users, 100 spaces, academic years 2027/28-2029/30. */
+SET NOCOUNT ON;
+IF OBJECT_ID(N'dbo.MAINTENANCE_IMPACT_EVENT',N'U') IS NULL OR OBJECT_ID(N'dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT',N'U') IS NULL THROW 52400,'Run artifact 10 first.',1;
+SELECT N'G03-GEN-V2' AS run_id,100000 AS target_bookings,120 AS generated_users,100 AS generated_spaces,
+       CONVERT(DATE,'2027-09-01') AS first_academic_year_start,3 AS academic_year_count,5000 AS recommended_batch_size;

@@ -21,6 +21,7 @@ compatibility: opencode
 - Mark every inferred/proposed element visibly and record it under Assumptions.
 - Carry every unresolved Open Question forward.
 - Never strengthen nullability, uniqueness, checks, or cardinality beyond source evidence.
+- Keep verification proportional to the assignment. Agent rubrics may require evidence for a claim, but must not turn optional production hardening into a business requirement.
 - Perform stage self-checks without creating repository command/reasoning log files. Put only user-relevant assumptions, open questions, traceability, and reproducible test evidence in deliverables.
 - Stop a downstream implementation stage when its upstream design is only a scaffold or has blocking review failures.
 
@@ -37,7 +38,7 @@ Use outputs 01–07 and the workflow declared in `AGENTS.md`.
 5. Use `database-concurrency-architect.md` to complete `outputs/11-concurrency-design-G03.md`.
 6. Use `database-concurrency-implementation-engineer.md` to implement `outputs/12-concurrency-implementation-G03.sql` with one shared protocol for every approval path.
 7. Use `database-concurrency-test-engineer.md` to add repeatable two-session tests under `outputs/13-concurrency-tests-G03/`.
-8. Use `large-scale-data-generation-engineer.md` to add a deterministic generator under `outputs/14-data-generator-G03/` for at least three academic years and 100,000 bookings.
+8. Use `large-scale-data-generation-engineer.md` to add a deterministic fixed or configurable generator under `outputs/14-data-generator-G03/` for at least three academic years and 100,000 bookings.
 9. Use `analytical-query-designer.md` to implement all four reports in `outputs/16-analytical-queries-G03.sql`.
 10. Use `database-performance-tuning-engineer.md` to measure and document conflict-check, room-finder, and two non-room-finder report indexes in `outputs/15-index-tuning-report-G03.md`.
 

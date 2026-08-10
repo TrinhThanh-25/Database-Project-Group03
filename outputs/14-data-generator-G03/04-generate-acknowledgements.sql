@@ -1,57 +1,15 @@
-:r 00-config.sql
-/*
- Generate advisory acknowledgements for current advisory maintenance disclosed
- to generated approved occupancy bookings.
-*/
-
-SET NOCOUNT ON;
-SET XACT_ABORT ON;
-
-DECLARE @run_prefix NVARCHAR(20) = N'$(G03_RUN_PREFIX)';
-DECLARE @advisory_impact_id INT = (SELECT impact_level_id FROM dbo.MAINTENANCE_IMPACT_LEVEL WHERE impact_level_code = N'advisory');
-
-IF @advisory_impact_id IS NULL
-    THROW 51440, 'Advisory impact lookup missing. Run 01-generate-reference-data.sql first.', 1;
-
-BEGIN TRANSACTION;
-
-INSERT INTO dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT (
-    booking_request_id,
-    maintenance_record_id,
-    acknowledged_impact_level_id,
-    acknowledged_at,
-    advisory_message_snapshot
-)
-SELECT
-    br.booking_request_id,
-    mr.maintenance_record_id,
-    @advisory_impact_id,
-    DATEADD(DAY, -10, br.requested_start_time),
-    mr.problem_description
-FROM dbo.BOOKING_REQUEST AS br
-INNER JOIN dbo.BOOKING_STATUS AS bs ON bs.booking_status_id = br.booking_status_id
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-INNER JOIN dbo.MAINTENANCE_RECORD AS mr
-    ON mr.space_id = br.space_id
-   AND mr.start_time < br.requested_end_time
-   AND ISNULL(mr.completion_time, CONVERT(DATETIME2(0), '9999-12-31T23:59:59')) > br.requested_start_time
-INNER JOIN dbo.MAINTENANCE_IMPACT_LEVEL AS mil ON mil.impact_level_id = mr.impact_level_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%'
-  AND mr.problem_description LIKE @run_prefix + N' advisory maintenance %'
-  AND bs.status_code IN (N'approved', N'checked_in', N'completed')
-  AND mil.impact_level_code = N'advisory'
-  AND NOT EXISTS (
-      SELECT 1
-      FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT AS baa
-      WHERE baa.booking_request_id = br.booking_request_id
-        AND baa.maintenance_record_id = mr.maintenance_record_id
-  );
-
-COMMIT TRANSACTION;
-
-SELECT
-    COUNT(*) AS generated_advisory_acknowledgement_count
-FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT AS baa
-INNER JOIN dbo.BOOKING_REQUEST AS br ON br.booking_request_id = baa.booking_request_id
-INNER JOIN dbo.SPACE AS s ON s.space_id = br.space_id
-WHERE s.unique_space_code LIKE @run_prefix + N'-SPACE-%';
+/* Generated requests are treated as submitted before the first event relevant
+   to their interval, thirty days before requested start. For escalated rows,
+   acknowledgement is stored only when that derived submission precedes the
+   2030-03-01 escalation. */
+SET NOCOUNT ON; SET XACT_ABORT ON;
+INSERT dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT(booking_request_id,maintenance_record_id)
+SELECT b.booking_request_id,m.maintenance_record_id
+FROM dbo.BOOKING_REQUEST b JOIN dbo.USER_ACCOUNT u ON u.user_account_id=b.requester_user_account_id
+JOIN dbo.MAINTENANCE_RECORD m ON m.space_id=b.space_id AND m.start_time<b.requested_end_time
+ AND COALESCE(m.completion_time,CONVERT(DATETIME2(0),'9999-12-31'))>b.requested_start_time
+WHERE u.user_id LIKE N'G03-GEN-U-%'
+  AND EXISTS(SELECT 1 FROM dbo.MAINTENANCE_IMPACT_EVENT e JOIN dbo.MAINTENANCE_IMPACT_LEVEL i ON i.impact_level_id=e.new_impact_level_id WHERE e.maintenance_record_id=m.maintenance_record_id AND e.old_impact_level_id IS NULL AND i.impact_level_code=N'advisory')
+  AND (TRY_CONVERT(INT,RIGHT(m.problem_description,3))>10 OR DATEADD(DAY,-30,b.requested_start_time)<'2030-03-01')
+  AND NOT EXISTS(SELECT 1 FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT a WHERE a.booking_request_id=b.booking_request_id AND a.maintenance_record_id=m.maintenance_record_id);
+SELECT COUNT(*) acknowledgement_rows FROM dbo.BOOKING_ADVISORY_ACKNOWLEDGEMENT a JOIN dbo.MAINTENANCE_RECORD m ON m.maintenance_record_id=a.maintenance_record_id WHERE m.problem_description LIKE N'G03-GEN-V2:%';

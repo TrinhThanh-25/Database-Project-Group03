@@ -1,231 +1,199 @@
-# Database Design Agent Project
+# Database Design Agent Project — Phase 2
 
-This project requires each group to build and improve an AI agent that reads a business requirement and generates database design artifacts from requirement analysis to SQL query design.
+Group 03 extends its Phase 1 Microsoft SQL Server database and AI-agent pipeline to support maintenance impact levels, advisory acknowledgements, safe concurrent approval, large-scale sample data, analytical reports, and index tuning.
 
-## 1. Install OpenCode
+Phase 2 builds on the Phase 1 artifacts; it does not replace them.
 
-OpenCode installation guide: [https://opencode.ai/docs/](https://opencode.ai/docs/)
+## 1. Phase 2 scope
 
-After installation, open the project folder and start OpenCode:
+The repository covers the following work:
 
-```bash
-cd path/to/your/project
-opencode
-```
+1. Analyse the changes from the Phase 1 business rules.
+2. Update the ERD, relational design, functional dependencies, and 3NF validation.
+3. Migrate the existing Phase 1 database without dropping existing data.
+4. Prevent overlapping approved bookings under concurrent instant and staff approval.
+5. Demonstrate the concurrency conflict and its prevention with repeatable two-session tests.
+6. Generate at least 100,000 realistic bookings across at least three academic years.
+7. Implement all four required analytical reports.
+8. Compare selected queries before and after indexing on the same dataset and parameters.
 
-During setup, choose the LLM provider and model that your group will use.
+The Phase 2 source requirement is preserved in [`req/phase-2-business-requirement.md`](req/phase-2-business-requirement.md).
 
-> Do not commit API keys, access tokens, or private credentials to Git.
+## 2. Technology
 
----
+- DBMS: Microsoft SQL Server
+- SQL dialect: T-SQL
+- Agent runner: OpenCode
+- ERD notation: Mermaid `erDiagram`
 
-### Connect OpenCode to an LLM Model
+The SQL scripts can be executed with SQL Server Management Studio, Azure Data Studio, or another SQL Server client that supports separate query sessions.
 
-After installing OpenCode, each group must connect OpenCode to at least one LLM provider before running the database design agent.
-
-OpenCode provider guide: [https://opencode.ai/docs/providers/](https://opencode.ai/docs/providers/)  
-OpenCode model guide: [https://opencode.ai/docs/models/](https://opencode.ai/docs/models/)
-
-#### Step 1: Start OpenCode
-
-Open the project folder in the terminal:
-
-```bash
-cd path/to/your/project
-opencode
-```
-
-#### Step 2: Connect an LLM Provider
-
-Inside OpenCode, run:
-
-```text
-/connect
-```
-
-Then select the LLM provider that your group wants to use, such as OpenAI, Anthropic, Gemini, OpenRouter, OpenCode Zen, or another supported provider.
-
-When requested, enter the API key or login information for the selected provider.
-
-> Do not commit API keys, access tokens, or private credentials to Git.
-
-#### Step 3: Select an LLM Model
-
-After connecting the provider, run:
-
-```text
-/models
-```
-
-Choose the model that your group wants to use for the project.
-
-## 2. Project Goal
-
-The agent must read the business requirement and generate the following database design artifacts:
-
-1. Business Requirement Analysis
-2. Conceptual Database Design
-3. Logical Database Design
-4. Database Design Validation
-5. Database Implementation
-6. Sample Data Preparation
-7. Query Design
-
-The group must also evaluate and improve the agent during the development process.
-
----
-
-## 3. Demo Project Structure
-
-The demo Git repository include the following files and folders, your group could adapt it:
+## 3. Repository structure
 
 ```text
 .
 ├── .opencode/
-│   ├── commands/
-│   │   └── design-db.md
-│   └── skills/
-│       └── db-design-pipeline/
-│           ├── templates/
-│           └── SKILL.md
+│   ├── agent/                         # Phase 1 and Phase 2 stage owners
+│   ├── commands/                      # Phase 1 slash commands
+│   ├── evaluation/                    # Phase 1 evaluation rubrics
+│   ├── templates/                     # Phase 1 artifact templates
+│   └── skills/db-design-pipeline/
+│       └── SKILL.md                   # Pipeline routing and execution guidance
 ├── req/
-│   └── business-requirement.md
-├── outputs/
-├── AGENTS.md
-├── README.md
-└── .gitignore
+│   ├── business-requirement.md
+│   └── phase-2-business-requirement.md
+├── outputs/                           # Numbered Phase 1 and Phase 2 deliverables
+├── AGENT.md                           # Assignment-facing agent summary
+├── AGENTS.md                          # Canonical project workflow and routing rules
+├── Database_Phase1_Report.pdf
+└── README.md
 ```
 
----
+Do not commit API keys, access tokens, private credentials, `node_modules/`, or temporary execution files.
 
-## 4. Main Files and Folders
+## 4. Agent workflow
 
-| File / Folder | Purpose |
-|---|---|
-| `.opencode/` | Stores OpenCode commands, skills, and related configuration. |
-| `.opencode/commands/design-db.md` | Defines the custom command used to run the database design pipeline. |
-| `.opencode/skills/db-design-pipeline/SKILL.md` | Defines the agent workflow, rules, design steps, and output requirements. |
-| `.opencode/skills/db-design-pipeline/templates/` | Stores templates used by the agent to generate consistent outputs. |
-| `req/business-requirement.md` | Contains the input business requirement. |
-| `outputs/` | Stores all generated project artifacts. |
-| `AGENTS.md` | Contains project-level instructions for the agent. |
-| `README.md` | Explains how to install, run, and evaluate the project. |
-| `.gitignore` | Excludes private or unnecessary files from Git. |
+Each stage has one owner in `.opencode/agent/`. A stage reads its declared upstream artifact as its primary input and writes only its owned output. `AGENTS.md` contains the canonical routing rules.
 
----
+### Phase 1 baseline
 
-## 5. How to Run the Agent
+| Stage | Owner | Output |
+|---:|---|---|
+| 1 | Business Analyst | `outputs/01-business-req-analysis-G03.md` |
+| 2 | Conceptual Database Designer | `outputs/02-erd-design-G03.md` |
+| 3 | Logical Database Designer | `outputs/03-logical-design-G03.md` |
+| 4 | Database Design Reviewer | `outputs/04-design-validation-G03.md` |
+| 5 | Database Definition Implementation Engineer | `outputs/05-db-definition-G03.sql` |
+| 6 | Sample Data Preparer | `outputs/06-sample-data-G03.sql` |
+| 7 | SQL Query Designer | `outputs/07-query-design-G03.sql` |
 
-Open the project folder:
+The existing Phase 1 slash commands remain available in `.opencode/commands/`, including `/design-db` for the Phase 1 pipeline.
+
+### Phase 2 extension
+
+| Artifact | Owner | Output |
+|---:|---|---|
+| 08 | Requirement Change Analyst | `outputs/08-requirement-change-analysis-G03.md` |
+| 09 | Phase 2 Database Design Updater | `outputs/09-updated-erd-and-logical-design-G03.md` |
+| 10 | Schema Migration Engineer | `outputs/10-schema-migration-G03.sql` |
+| 11 | Database Concurrency Architect | `outputs/11-concurrency-design-G03.md` |
+| 12 | Database Concurrency Implementation Engineer | `outputs/12-concurrency-implementation-G03.sql` |
+| 13 | Database Concurrency Test Engineer | `outputs/13-concurrency-tests-G03/` |
+| 14 | Large-scale Data Generation Engineer | `outputs/14-data-generator-G03/` |
+| 16 | Analytical Query Designer | `outputs/16-analytical-queries-G03.sql` |
+| 15 | Database Performance Tuning Engineer | `outputs/15-index-tuning-report-G03.md` |
+
+The assignment numbers the tuning report as artifact 15 and the analytical queries as artifact 16. Because tuning requires executable queries, the execution order is `08 → 09 → 10 → 11 → 12 → 13 → 14 → 16 → 15`; the filenames retain the assigned numbers.
+
+Phase 2 does not define additional slash commands. In OpenCode, request the relevant owner-agent by stage and require it to read the previous stage's output before updating its artifact.
+
+## 5. Running the database artifacts
+
+Use a disposable SQL Server database for the full demonstration.
+
+### 5.1. Establish the Phase 1 baseline
+
+Run in order:
+
+```text
+outputs/05-db-definition-G03.sql
+outputs/06-sample-data-G03.sql
+```
+
+### 5.2. Apply the Phase 2 implementation
+
+Run in order:
+
+```text
+outputs/10-schema-migration-G03.sql
+outputs/12-concurrency-implementation-G03.sql
+```
+
+The migration is additive and data-preserving. It must not reuse the destructive Phase 1 drop-and-recreate block.
+
+### 5.3. Run the two-session concurrency demonstration
+
+Open two independent SQL Server query windows and follow:
+
+```text
+outputs/13-concurrency-tests-G03/README.md
+```
+
+The folder contains setup, unsafe demonstration, safe demonstration, verification, cleanup, and captured result notes. The safe case demonstrates that after Session A commits, Session B rechecks under synchronization, detects the overlap, and returns conflict error `52103`.
+
+### 5.4. Generate and validate the large dataset
+
+Follow the exact order in:
+
+```text
+outputs/14-data-generator-G03/README.md
+```
+
+The generator creates deterministic data spanning three academic years, including at least 100,000 bookings, maintenance records, cancellations, no-shows, approval history, usage lifecycle data, and advisory acknowledgements. Run `05-validate-generated-data.sql` after generation.
+
+### 5.5. Run reports and index analysis
+
+Use:
+
+```text
+outputs/16-analytical-queries-G03.sql
+outputs/15-index-tuning-report-G03.md
+```
+
+Artifact 16 implements all four required reports. Artifact 15 documents the reproducible before/after protocol for the booking conflict check, room finder, and two selected reporting queries. Performance comparisons must use the same database state and parameters and capture actual execution plans plus `STATISTICS IO/TIME` evidence.
+
+## 6. Phase 2 deliverables
+
+```text
+outputs/08-requirement-change-analysis-G03.md
+outputs/09-updated-erd-and-logical-design-G03.md
+outputs/10-schema-migration-G03.sql
+outputs/11-concurrency-design-G03.md
+outputs/12-concurrency-implementation-G03.sql
+outputs/13-concurrency-tests-G03/
+outputs/14-data-generator-G03/
+outputs/15-index-tuning-report-G03.md
+outputs/16-analytical-queries-G03.sql
+```
+
+The source requirement spells artifact 16 with the `.sq` extension. Group 03 uses `.sql` because the artifact is an executable Microsoft SQL Server script; the discrepancy is recorded in the preserved requirement.
+
+The assignment also requires `G03_Report_P2.pdf`, containing group contributions, models used, agent improvements, concurrency design and test results, index-tuning evidence, functional dependencies, and 3NF proof or decomposition.
+
+## 7. Approved demo conventions
+
+The artifacts consistently use these project decisions:
+
+- Times stored in the project are interpreted as Vietnam local time (`Asia/Ho_Chi_Minh`, UTC+07:00).
+- The existing `usage_policy` remains unchanged.
+- Demo auto-approval compares the requester's guest count with the permitted occupancy.
+- `System` represents an automated approval actor.
+- An advisory is active when the maintenance level is `advisory` and the latest record status is `Reported` or `In progress`; “maintenance is still open” has the same meaning.
+- Approved occupancy conflicts consider bookings with status `approved` or `checked_in` whose time intervals overlap.
+- All approval paths use the shared space-then-booking lock order.
+
+These conventions are intentionally limited to the agreed demo scope rather than presented as production policy.
+
+## 8. OpenCode setup
+
+Install OpenCode using its official documentation, open this repository, and select an LLM provider and model:
 
 ```bash
-cd path/to/your/project
+cd path/to/Database-Project-Group03
 opencode
 ```
 
-Run the custom command:
+Inside OpenCode, use `/connect` to configure a provider and `/models` to select a model. Never store provider credentials in the repository.
 
-```text
-/design-db req/business-requirement.md
-```
+To control token usage, update only the requested stage instead of regenerating the whole pipeline. Review every generated artifact and preserve traceability, assumptions, and unresolved open questions.
 
-If your group uses a different command name, update this README with the correct command.
+## 9. Academic responsibility
 
-Alternatively, run each stage of the pipeline individually with its own command. Each stage reads the output of the previous stage(s) and writes one file to `outputs/`:
+AI tools support the design process, but Group 03 remains responsible for understanding and validating the delivered work. Group members must be able to explain:
 
-| Order | Command | Reads | Writes |
-|---|---|---|---|
-| 1 | `/analyze-requirement` | `req/business-requirement.md` | `outputs/01-business-req-analysis-G03.md` |
-| 2 | `/design-conceptual-database` | `outputs/01-business-req-analysis-G03.md` | `outputs/02-erd-design-G03.md` |
-| 3 | `/design-logical-database` | `outputs/02-erd-design-G03.md` | `outputs/03-logical-design-G03.md` |
-| 4 | `/validate-database-design` | `req/business-requirement.md`, `outputs/01-*`, `outputs/02-*`, `outputs/03-*` | `outputs/04-design-validation-G03.md` |
-| 5 | `/implement-database-definition` (aliases: `/implement`, `/create-tables`, `/ddl`) | `outputs/03-logical-design-G03.md`, `outputs/04-design-validation-G03.md` | `outputs/05-db-definition-G03.sql` |
-| 6 | `/prepare-sample-data` | `outputs/05-db-definition-G03.sql` | `outputs/06-sample-data-G03.sql` |
-| 7 | `/design-query` | `outputs/01-business-req-analysis-G03.md`, `outputs/05-db-definition-G03.sql` | `outputs/07-query-design-G03.sql` |
-
-Run each command in order, e.g.:
-
-```text
-/analyze-requirement
-/design-conceptual-database
-/design-logical-database
-/validate-database-design
-/implement-database-definition
-/prepare-sample-data
-/design-query
-```
-
----
-
-## 6. Required Output Artifacts
-
-The `outputs/` folder must contain the following files:
-
-```text
-01-business-req-analysis-G<Group number>.md
-02-erd-design-G<Group number>.md
-03-logical-design-G<Group number>.md
-04-design-validation-G<Group number>.md
-05-db-definition-G<Group number>.sql
-06-sample-data-G<Group number>.sql
-07-query-design-G<Group number>.sql
-```
-
-Example for Group 01:
-
-```text
-01-business-req-analysis-G01.md
-02-erd-design-G01.md
-03-logical-design-G01.md
-04-design-validation-G01.md
-05-db-definition-G01.sql
-06-sample-data-G01.sql
-07-query-design-G01.sql
-```
-
-
-## 7. Notes on LLM Model Usage and Cost Control
-
-Using LLM models may consume tokens and API credits. To avoid unnecessary cost:
-
-- Use a cheaper or faster model for early drafts.
-- Use a stronger model only for difficult reasoning, validation, and final review.
-- Do not repeatedly regenerate all files from scratch.
-- Ask the agent to update only the specific file or section that needs improvement.
-- Keep prompts short, clear, and specific.
-- Avoid sending unnecessary files such as `node_modules/`, `.git/`, logs, or large temporary files.
-- Stop the agent if it loops or repeatedly produces similar outputs.
-- Never commit API keys or tokens to Git.
-
-Good prompt example:
-
-```text
-Read req/business-requirement.md and generate only outputs/01-business-req-analysis-G01.md.
-```
-
-Better than:
-
-```text
-Read the whole project and redo everything.
-```
-
-Another good prompt example:
-
-```text
-Use outputs/02-erd-design-G01.md to generate only outputs/03-logical-design-G01.md. Do not modify other files.
-```
-
----
-
-## 8. Academic Integrity
-
-Students may use AI tools to support the project, but they are responsible for reviewing, evaluating, and improving the generated outputs.
-
-Do not submit raw AI output without understanding or validation.
-
-Each group must be able to explain:
-
-- How the agent was configured.
-- How the agent was improved.
-- Why the final database design is valid.
-- How the SQL scripts and queries work.
+- how the agent pipeline was configured and improved;
+- why the Phase 2 schema and migration preserve the Phase 1 design;
+- how the concurrency protocol prevents overlapping approvals;
+- how the generated data represents valid booking lifecycles;
+- how the analytical queries and selected indexes work; and
+- how the relations satisfy Third Normal Form.
