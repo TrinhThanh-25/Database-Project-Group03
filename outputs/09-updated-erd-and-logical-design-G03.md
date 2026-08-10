@@ -80,7 +80,122 @@ No Phase 1 relation is deprecated.
 - The instant-approval configuration contains zero or many distinct space-type values and has no physical FK to `SPACE`.
 - Existing Phase 1 relationships and cardinalities remain unchanged.
 
-## 6. Canonical Mermaid `erDiagram`
+## 6. Phase 2 Mermaid ERD
+
+### 6.1 ERD-Overview: Entity-Relationship Overview
+
+This conceptual overview retains the Phase 1 entities and relationships and adds the Phase 2 maintenance-impact, impact-history, advisory-acknowledgement, and instant-approval configuration concepts. Yellow entities and relationships are new in Phase 2.
+
+```mermaid
+flowchart TB
+  USER_ACCOUNT[USER_ACCOUNT]:::entity
+  DEPARTMENT[DEPARTMENT]:::entity
+  ROLE[ROLE]:::entity
+  ACCOUNT_STATUS[ACCOUNT_STATUS]:::entity
+  SPACE[SPACE]:::entity
+  SPACE_STATUS[SPACE_STATUS]:::entity
+  FACILITY[FACILITY]:::entity
+  BOOKING_REQUEST[BOOKING_REQUEST]:::entity
+  BOOKING_STATUS[BOOKING_STATUS]:::entity
+  APPROVAL_DECISION[APPROVAL_DECISION]:::entity
+  USAGE_SESSION[USAGE_SESSION]:::entity
+  MAINTENANCE_RECORD[MAINTENANCE_RECORD]:::entity
+  MAINTENANCE_STATUS[MAINTENANCE_STATUS]:::entity
+  MAINTENANCE_IMPACT_LEVEL[MAINTENANCE_IMPACT_LEVEL]:::newentity
+  MAINTENANCE_IMPACT_EVENT[MAINTENANCE_IMPACT_EVENT]:::newentity
+  BOOKING_ADVISORY_ACKNOWLEDGEMENT[BOOKING_ADVISORY_ACKNOWLEDGEMENT]:::newentity
+  INSTANT_APPROVAL_SPACE_TYPE[INSTANT_APPROVAL_SPACE_TYPE]:::newentity
+
+  BELONGS_TO{belongs_to}:::rel
+  IS_MANAGED_BY{is_managed_by}:::rel
+  HAS_ROLE{has_role}:::rel
+  HAS_ACCOUNT_STATUS{has_account_status}:::rel
+  HAS_SPACE_STATUS{has_space_status}:::rel
+  HAS_BOOKING_STATUS{has_booking_status}:::rel
+  HAS_DECISION_OUTCOME{has_decision_outcome}:::rel
+  HAS_MAINTENANCE_STATUS{has_maintenance_status}:::rel
+  HAS_FACILITY{has_facility}:::rel
+  SUBMITS{submits}:::rel
+  SELECTS{selects}:::rel
+  HAS_APPROVAL_DECISION{has_approval_decision}:::rel
+  MAKES_DECISION{makes_decision}:::rel
+  HAS_USAGE_SESSION{has_usage_session}:::rel
+  CHECKS_IN{checks_in}:::rel
+  COMPLETES{completes}:::rel
+  HAS_MAINTENANCE_RECORD{has_maintenance_record}:::rel
+  REPORTS{reports}:::rel
+  ASSIGNED_TO{assigned_to}:::rel
+  HAS_CURRENT_IMPACT{has_current_impact}:::newrel
+  HAS_IMPACT_EVENT{has_impact_event}:::newrel
+  HAS_OLD_IMPACT{has_old_impact}:::newrel
+  HAS_NEW_IMPACT{has_new_impact}:::newrel
+  ACKNOWLEDGES{acknowledges_advisory}:::newrel
+  ACKNOWLEDGES_RECORD{acknowledges_record}:::newrel
+  MATCHES_SELECTED_TYPE{matches_selected_type}:::newrel
+
+  USER_ACCOUNT ---|"1..1"| BELONGS_TO
+  BELONGS_TO ---|"0..*"| DEPARTMENT
+  DEPARTMENT ---|"0..1"| IS_MANAGED_BY
+  IS_MANAGED_BY ---|"0..*"| USER_ACCOUNT
+  USER_ACCOUNT ---|"1..1"| HAS_ROLE
+  HAS_ROLE ---|"0..*"| ROLE
+  USER_ACCOUNT ---|"1..1"| HAS_ACCOUNT_STATUS
+  HAS_ACCOUNT_STATUS ---|"0..*"| ACCOUNT_STATUS
+  SPACE ---|"1..1"| HAS_SPACE_STATUS
+  HAS_SPACE_STATUS ---|"0..*"| SPACE_STATUS
+  BOOKING_REQUEST ---|"1..1"| HAS_BOOKING_STATUS
+  HAS_BOOKING_STATUS ---|"0..*"| BOOKING_STATUS
+  APPROVAL_DECISION ---|"1..1"| HAS_DECISION_OUTCOME
+  HAS_DECISION_OUTCOME ---|"0..*"| BOOKING_STATUS
+  MAINTENANCE_RECORD ---|"1..1"| HAS_MAINTENANCE_STATUS
+  HAS_MAINTENANCE_STATUS ---|"0..*"| MAINTENANCE_STATUS
+  SPACE ---|"0..*"| HAS_FACILITY
+  HAS_FACILITY ---|"0..*"| FACILITY
+  USER_ACCOUNT ---|"0..*"| SUBMITS
+  SUBMITS ---|"1..1"| BOOKING_REQUEST
+  BOOKING_REQUEST ---|"1..1"| SELECTS
+  SELECTS ---|"0..*"| SPACE
+  BOOKING_REQUEST ---|"0..*"| HAS_APPROVAL_DECISION
+  HAS_APPROVAL_DECISION ---|"1..1"| APPROVAL_DECISION
+  USER_ACCOUNT ---|"0..*"| MAKES_DECISION
+  MAKES_DECISION ---|"1..1"| APPROVAL_DECISION
+  BOOKING_REQUEST ---|"0..1"| HAS_USAGE_SESSION
+  HAS_USAGE_SESSION ---|"1..1"| USAGE_SESSION
+  USER_ACCOUNT ---|"0..*"| CHECKS_IN
+  CHECKS_IN ---|"1..1"| USAGE_SESSION
+  USER_ACCOUNT ---|"0..*"| COMPLETES
+  COMPLETES ---|"0..1"| USAGE_SESSION
+  SPACE ---|"0..*"| HAS_MAINTENANCE_RECORD
+  HAS_MAINTENANCE_RECORD ---|"1..1"| MAINTENANCE_RECORD
+  USER_ACCOUNT ---|"0..*"| REPORTS
+  REPORTS ---|"1..1"| MAINTENANCE_RECORD
+  USER_ACCOUNT ---|"0..*"| ASSIGNED_TO
+  ASSIGNED_TO ---|"0..1"| MAINTENANCE_RECORD
+
+  MAINTENANCE_RECORD ---|"1..1"| HAS_CURRENT_IMPACT
+  HAS_CURRENT_IMPACT ---|"0..*"| MAINTENANCE_IMPACT_LEVEL
+  MAINTENANCE_RECORD ---|"1..*"| HAS_IMPACT_EVENT
+  HAS_IMPACT_EVENT ---|"1..1"| MAINTENANCE_IMPACT_EVENT
+  MAINTENANCE_IMPACT_EVENT ---|"0..1"| HAS_OLD_IMPACT
+  HAS_OLD_IMPACT ---|"0..*"| MAINTENANCE_IMPACT_LEVEL
+  MAINTENANCE_IMPACT_EVENT ---|"1..1"| HAS_NEW_IMPACT
+  HAS_NEW_IMPACT ---|"0..*"| MAINTENANCE_IMPACT_LEVEL
+  BOOKING_REQUEST ---|"0..*"| ACKNOWLEDGES
+  ACKNOWLEDGES ---|"1..1"| BOOKING_ADVISORY_ACKNOWLEDGEMENT
+  BOOKING_ADVISORY_ACKNOWLEDGEMENT ---|"1..1"| ACKNOWLEDGES_RECORD
+  ACKNOWLEDGES_RECORD ---|"0..*"| MAINTENANCE_RECORD
+  SPACE ---|"0..1 logical match"| MATCHES_SELECTED_TYPE
+  MATCHES_SELECTED_TYPE ---|"0..*"| INSTANT_APPROVAL_SPACE_TYPE
+
+  classDef entity fill:#cfe8ff,stroke:#1b4965,stroke-width:2px,color:#1b4965
+  classDef rel fill:#ffe8b3,stroke:#8a5a00,stroke-width:1px,color:#6b4400
+  classDef newentity fill:#fff2b3,stroke:#8a5a00,stroke-width:2px,color:#6b4400
+  classDef newrel fill:#ffd6a5,stroke:#9c4f00,stroke-width:1.5px,color:#6b3300
+```
+
+The instant-approval connection is a logical text match, not a physical foreign key. The dedicated `System` actor is represented by seeded rows in existing `ROLE` and `USER_ACCOUNT`, so it does not introduce another entity type.
+
+### 6.2 Canonical updated `erDiagram`
 
 The diagram contains one relationship line for every physical foreign key in Section 7. Logical matching between `SPACE.space_type` and `INSTANT_APPROVAL_SPACE_TYPE.space_type` is intentionally not a foreign key because Phase 1 has no unique space-type parent relation.
 

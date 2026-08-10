@@ -281,10 +281,6 @@ BEGIN
         UPDATE dbo.MAINTENANCE_RECORD SET impact_level_id=@NewId WHERE maintenance_record_id=@maintenance_record_id;
         INSERT dbo.MAINTENANCE_IMPACT_EVENT(maintenance_record_id,old_impact_level_id,new_impact_level_id,changed_at)
         VALUES(@maintenance_record_id,@OldId,@NewId,@ChangedAt);
-        COMMIT TRANSACTION;
-
-        SELECT @maintenance_record_id AS maintenance_record_id,@OldCode AS old_impact_level_code,
-               @new_impact_level_code AS new_impact_level_code,@ChangedAt AS changed_at;
         IF @OldCode=N'advisory' AND @new_impact_level_code=N'out_of_service'
             SELECT br.booking_request_id,br.requester_user_account_id,u.user_id,u.full_name,u.email,
                    br.requested_start_time,br.requested_end_time,bs.status_code
@@ -294,6 +290,10 @@ BEGIN
               AND br.requested_start_time<COALESCE(@End,CONVERT(DATETIME2(0),'9999-12-31'))
               AND br.requested_end_time>CASE WHEN @ChangedAt>@Start THEN @ChangedAt ELSE @Start END
             ORDER BY br.booking_request_id;
+        COMMIT TRANSACTION;
+
+        SELECT @maintenance_record_id AS maintenance_record_id,@OldCode AS old_impact_level_code,
+               @new_impact_level_code AS new_impact_level_code,@ChangedAt AS changed_at;
     END TRY
     BEGIN CATCH
         IF XACT_STATE()<>0 ROLLBACK TRANSACTION;
