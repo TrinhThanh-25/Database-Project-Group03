@@ -4,43 +4,125 @@
 
 Status: **EXECUTED — PASS** on 2026-08-10.
 
-- SQL Server 2022 Developer Edition 16.0.4255.1 (CU25), Linux, compatibility level 160.
-- Dataset: `G03-GEN-V2`, 100,000 generated bookings across academic-year starts 2027–2029; artifact 14 validation returned `PASS` with zero approved-overlap errors.
-- The corrected generator has 10,890 advisory acknowledgements and 70,000 approval decisions: 15,000 automatic approved decisions use the active `System` actor, while 45,000 approved and 10,000 rejected decisions use active facility staff. It uses four space types, four capacity bands, seven purposes, and every space has all seven lifecycle statuses. Validation rejects an automatic decision on an unconfigured type, an over-capacity participant count, or an overlapping approval made after an out-of-service escalation. W3 and W4 deliberately use approval history rather than inferring historical approval from current status. The actor correction does not change W1–W4 predicates or result aggregates because none of those workloads filters by decision actor.
-- Actual plans were captured with `STATISTICS PROFILE/XML`; reads and time used `SET STATISTICS IO,TIME ON`.
-
-The baseline contained clustered PK indexes and `UQ_SPACE_FACILITY_space_id_facility_id`; there were no manual indexes on `BOOKING_REQUEST`, `APPROVAL_DECISION`, or `MAINTENANCE_RECORD`.
+- SQL Server 2022 Developer Edition 16.0.4255.1, Linux, compatibility level 160.
+- Dedicated benchmark database: `G03Phase2BenchmarkCurrent`.
+- The database was rebuilt from the current artifacts 05, 06, 10, 12, 14, and 16. A previously existing database was rejected because it failed the current artifact-14 validator; none of its measurements are used below.
+- Dataset: 100,000 `G03-GEN-V2` bookings across academic-year starts 2027–2029, plus nine Phase 1 bookings. It contains 70,007 total approval decisions, 10,890 advisory acknowledgements, and 103 maintenance records.
+- Artifact 14 validation returned `PASS`: every recorded error count was zero, the generated booking count was 100,000, and `DBCC CHECKCONSTRAINTS` printed no violation row.
+- Before tuning, the four measured fact/association tables had only clustered PK indexes, except for the existing unique `UQ_SPACE_FACILITY_space_id_facility_id`. There was no manual index on `BOOKING_REQUEST`, `APPROVAL_DECISION`, or `MAINTENANCE_RECORD`.
+- Result-only output before and after indexing was byte-for-byte identical: 250 lines with SHA-256 `eb44f1c5afeaa1ea9d099ddc16efef4172a9aa665e8ffe4ebef02c49188acd7c`.
+- `STATISTICS IO/TIME` was captured with plan serialization disabled. Actual-row plans were captured separately with `SET STATISTICS PROFILE ON`, so plan-output overhead is excluded from the reported elapsed time.
 
 ## 2. Fixed workloads and parameters
 
-| Workload | Parameters |
-|---|---|
-| W1 conflict check | Space `G03-GEN-S-050`; statuses approved/checked-in; `2028-09-01 08:00–09:00` |
-| W2 room finder | `2029-09-01 10:00–11:00`; capacity 30; generated Projector facility ID; active advisories are present |
-| W3 approved hours | Semester `[2027-09-01, 2028-09-01)` |
-| W4 weekday/hour | Same semester; booking-start weekday/hour buckets |
+| Workload | Fixed parameters | Result rows |
+|---|---|---:|
+| W1 conflict check | Space `G03-GEN-S-050`; current statuses `approved`/`checked_in`; `[2028-09-01 08:00, 09:00)` | 1 |
+| W2 room finder | `[2029-09-01 10:00, 11:00)`; capacity 30; generated Projector facility ID | 100 |
+| W3 approved hours | Semester `[2027-09-01, 2028-09-01)` | 109 |
+| W4 weekday/hour | Same semester; booking-start weekday/hour buckets | 28 |
 
-The table preserves the captured before/after summary. Acceptance depends on the reproducible same-session protocol in Section 5, not on a required number of repetitions.
+W1 uses the current occupancy rule. W2–W4 execute the current artifact-16 procedures. W3 and W4 use approved `APPROVAL_DECISION` history rather than inferring historical approval from current booking status.
 
-## 3. Before/after evidence
+## 3. Measured before/after results
 
-| Workload | Main logical reads before → after | CPU ms before → after | Elapsed ms before → after | Rows/checksum unchanged |
+One compilation/warm-up pass preceded each measured state. The same SQL Server session, database, data, parameters, and result ordering were used before and after indexing.
+
+| Workload | Main logical reads before → after | CPU ms before → after | Elapsed ms before → after | Result equivalence |
 |---|---:|---:|---:|---|
-| W1 conflict | Booking 833 → 6 | 5 → 0 displayed | 4 → 0 displayed | 1 / 1,123,453,404 — PASS |
-| W2 room finder | Booking 83,300 → 700; maintenance 800 → 400; space-facility 208 → 208 | 417 → 5 | 416 → 4 | 100 / 66,896 — PASS |
-| W3 approved hours | Booking 833 → 111; approval decision 968 → 181 | 45 → 39 | 45 → 39 | 109 / 16 — PASS |
-| W4 weekday/hour | Booking 833 → 111; approval decision 968 → 181 | 35 → 28 | 34 → 28 | 28 / 228 — PASS |
+| W1 conflict | `BOOKING_REQUEST` 833 → 6 | 7 → 0 displayed | 7 → 0 displayed | 1 row, identical |
+| W2 room finder | `BOOKING_REQUEST` 83,300 → 700; `MAINTENANCE_RECORD` 800 → 400; `SPACE_FACILITY` 208 → 208 | 430 → 4 | 430 → 3 | 100 rows, identical |
+| W3 approved hours | `BOOKING_REQUEST` 833 → 111; `APPROVAL_DECISION` 864 → 181 | 43 → 40 | 42 → 40 | 109 rows, identical |
+| W4 weekday/hour | `BOOKING_REQUEST` 833 → 111; `APPROVAL_DECISION` 864 → 181 | 34 → 28 | 34 → 28 | 28 rows, identical |
 
-Zero milliseconds is SQL Server timer resolution, not zero work.
+Zero milliseconds is SQL Server timer resolution, not zero work. W3 and W4 improve IO substantially but only modestly improve elapsed time on this classroom dataset because the measured semester still contains 33,400 bookings and both reports must aggregate their qualifying rows.
 
-Actual-plan observations:
+### 3.1 Captured `STATISTICS IO/TIME` evidence
 
-- **W1:** the clustered scan of 100,000 booking rows became a seek on `IX_BOOKING_REQUEST_space_status_start`; requested end time is included to avoid a lookup. Concurrency correctness still comes from the reviewed lock protocol.
-- **W2:** repeated full booking scans became per-space seeks on `IX_BOOKING_REQUEST_space_status_start`; per-space maintenance scans became seeks on `IX_MAINTENANCE_RECORD_space_status_impact_start`. The existing `(space_id, facility_id)` unique index remained the facility access path. A separately tested status-leading booking index was not retained because the actual plan did not use it.
-- **W3:** the 100,000-row booking scan became a time-range seek on `IX_BOOKING_REQUEST_start_space`. Approval history uses the covering `IX_APPROVAL_DECISION_outcome_booking_time`; it is scanned because the measured semester contains a large fraction of approved decisions, but reads fall from 968 to 181.
-- **W4:** the booking side became a bounded start-time seek on `IX_BOOKING_REQUEST_start_space`; approval history uses the same covering decision index. Deterministic weekday/start-hour grouping was unchanged.
+The following normalized excerpts retain the measured table, scan-count, logical-read, physical-read, CPU, and elapsed-time values from the baseline output:
 
-## 4. Final index DDL
+```text
+=== W1_CONFLICT ===
+Table 'BOOKING_REQUEST'. Scan count 1, logical reads 833, physical reads 0.
+CPU time = 7 ms, elapsed time = 7 ms.
+
+=== W2_ROOM_FINDER ===
+Table 'MAINTENANCE_RECORD'. Scan count 101, logical reads 800, physical reads 0.
+Table 'BOOKING_REQUEST'. Scan count 1, logical reads 83300, physical reads 0.
+Table 'SPACE_FACILITY'. Scan count 0, logical reads 208, physical reads 0.
+CPU time = 430 ms, elapsed time = 430 ms.
+
+=== W3_APPROVED_HOURS ===
+Table 'BOOKING_REQUEST'. Scan count 1, logical reads 833, physical reads 0.
+Table 'APPROVAL_DECISION'. Scan count 1, logical reads 864, physical reads 0.
+CPU time = 43 ms, elapsed time = 42 ms.
+
+=== W4_WEEKDAY_HOUR ===
+Table 'BOOKING_REQUEST'. Scan count 1, logical reads 833, physical reads 0.
+Table 'APPROVAL_DECISION'. Scan count 1, logical reads 864, physical reads 0.
+CPU time = 34 ms, elapsed time = 34 ms.
+```
+
+The corresponding measured output after applying the four retained indexes was:
+
+```text
+=== W1_CONFLICT ===
+Table 'BOOKING_REQUEST'. Scan count 2, logical reads 6, physical reads 0.
+CPU time = 0 ms, elapsed time = 0 ms.
+
+=== W2_ROOM_FINDER ===
+Table 'MAINTENANCE_RECORD'. Scan count 200, logical reads 400, physical reads 0.
+Table 'BOOKING_REQUEST'. Scan count 200, logical reads 700, physical reads 0.
+Table 'SPACE_FACILITY'. Scan count 0, logical reads 208, physical reads 0.
+CPU time = 4 ms, elapsed time = 3 ms.
+
+=== W3_APPROVED_HOURS ===
+Table 'BOOKING_REQUEST'. Scan count 1, logical reads 111, physical reads 0.
+Table 'APPROVAL_DECISION'. Scan count 1, logical reads 181, physical reads 0.
+CPU time = 40 ms, elapsed time = 40 ms.
+
+=== W4_WEEKDAY_HOUR ===
+Table 'BOOKING_REQUEST'. Scan count 1, logical reads 111, physical reads 0.
+Table 'APPROVAL_DECISION'. Scan count 1, logical reads 181, physical reads 0.
+CPU time = 28 ms, elapsed time = 28 ms.
+```
+
+The increased scan counts in tuned W2 are repeated per-space seeks, not full-table scans; the logical-read reduction from 83,300 to 700 confirms the different access pattern. Supporting lookup reads, including `SPACE_FACILITY` 208, were unchanged and are not hidden in the comparison.
+
+## 4. Captured actual-plan evidence
+
+`SET STATISTICS PROFILE ON` reports actual rows and executions. The profile capture was performed after the measured IO/TIME pass with unchanged parameters.
+
+| Workload | Before indexing | After indexing |
+|---|---|---|
+| W1 | `Clustered Index Scan` on `PK_BOOKING_REQUEST`; actual output 1 row | `Index Seek` on `IX_BOOKING_REQUEST_space_status_start`; actual output 1 row |
+| W2 booking exclusion | Repeated `Clustered Index Scan` on `PK_BOOKING_REQUEST` | Repeated `Index Seek` on `IX_BOOKING_REQUEST_space_status_start` |
+| W2 maintenance checks | Two repeated `Clustered Index Scan` operators on `PK_MAINTENANCE_RECORD` | Two repeated `Index Seek` operators on `IX_MAINTENANCE_RECORD_space_status_impact_start` |
+| W3 booking range | `Clustered Index Scan` on `PK_BOOKING_REQUEST`; actual input 33,400 rows | `Index Seek` on `IX_BOOKING_REQUEST_start_space`; actual input 33,400 rows |
+| W3 approval history | `Clustered Index Scan` on `PK_APPROVAL_DECISION`; actual input 70,007 rows | Covering `Index Scan` on `IX_APPROVAL_DECISION_outcome_booking_time`; 60,007 approved rows flow from the indexed outcome range |
+| W4 booking range | `Clustered Index Scan` on `PK_BOOKING_REQUEST`; actual input 33,400 rows | Bounded `Index Seek` on `IX_BOOKING_REQUEST_start_space`; actual input 33,400 rows |
+| W4 approval history | `Clustered Index Scan` on `PK_APPROVAL_DECISION`; actual input 70,007 rows | Covering `Index Scan` on `IX_APPROVAL_DECISION_outcome_booking_time`; 60,007 approved rows flow from the indexed outcome range |
+
+Representative raw actual-profile operator text:
+
+```text
+W1 before: Clustered Index Scan OBJECT: BOOKING_REQUEST.PK_BOOKING_REQUEST
+W1 after:  Index Seek OBJECT: BOOKING_REQUEST.IX_BOOKING_REQUEST_space_status_start
+
+W2 before: Clustered Index Scan OBJECT: BOOKING_REQUEST.PK_BOOKING_REQUEST
+W2 after:  Index Seek OBJECT: BOOKING_REQUEST.IX_BOOKING_REQUEST_space_status_start
+W2 before: Clustered Index Scan OBJECT: MAINTENANCE_RECORD.PK_MAINTENANCE_RECORD
+W2 after:  Index Seek OBJECT: MAINTENANCE_RECORD.IX_MAINTENANCE_RECORD_space_status_impact_start
+
+W3/W4 before: Clustered Index Scan OBJECT: BOOKING_REQUEST.PK_BOOKING_REQUEST
+W3/W4 after:  Index Seek OBJECT: BOOKING_REQUEST.IX_BOOKING_REQUEST_start_space
+W3/W4 before: Clustered Index Scan OBJECT: APPROVAL_DECISION.PK_APPROVAL_DECISION
+W3/W4 after:  Index Scan OBJECT: APPROVAL_DECISION.IX_APPROVAL_DECISION_outcome_booking_time
+```
+
+The approval-decision operator remains a scan because approved history is a large fraction of the 70,007 decision rows. The narrower covering index still reduces its logical reads from 864 to 181. Indexes improve access paths; concurrency correctness continues to come from the artifact-11/12 per-space locking protocol.
+
+## 5. Final retained index DDL
 
 ```sql
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.BOOKING_REQUEST') AND name=N'IX_BOOKING_REQUEST_space_status_start')
@@ -63,36 +145,19 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.MAINTEN
     INCLUDE(completion_time);
 ```
 
-The two booking indexes have different leading keys: same-space conflict/current room availability and historical time-range reporting. The approval-decision index covers the historical approval predicate. The maintenance index serves room availability. The unused status-leading booking candidate and an extra facility index were not retained.
+The two booking indexes have different leading keys: same-space conflict/current room availability and semester time-range reporting. The approval-decision index covers historical approval, and the maintenance index supports both out-of-service exclusion and advisory visibility in the room finder. The existing `(space_id, facility_id)` unique index already serves facility relational division, so no additional facility index is retained.
 
-## 5. Reproduction and limitations
+## 6. Reproduction protocol and limitations
 
-On a clean database, run artifacts 05, 06, 10, 12, 14 and 16, then confirm artifact 14 validation, including its statistics refresh. Use one SQL Server session and the exact parameters in Section 2:
+On a clean SQL Server database:
 
-1. Execute W1–W4 once with statistics disabled as a compilation/warm-up pass.
-2. Enable `SET STATISTICS IO ON` and `SET STATISTICS TIME ON` with `STATISTICS XML OFF`; execute each workload once and save its messages and result set as the baseline.
-3. Disable IO/TIME statistics, enable `SET STATISTICS XML ON`, execute each workload once with the same parameters, save the actual plans, then disable XML. This separate capture avoids adding plan serialization to the reported elapsed time.
-4. Apply exactly the four retained indexes in Section 4 and execute the same statistics-disabled warm-up pass once.
-5. Repeat Steps 2 and 3 once with unchanged parameters.
-6. Compare the saved result sets before comparing reads, elapsed time, or operators. A tuning result is invalid if the result differs.
+1. Run artifacts 05, 06, 10, 12, the artifact-14 scripts in documented order, and artifact 16.
+2. Run artifact 14 validation. Stop unless every error count is zero and `DBCC CHECKCONSTRAINTS` prints no violation row.
+3. Confirm the baseline has no manual indexes on `BOOKING_REQUEST`, `APPROVAL_DECISION`, or `MAINTENANCE_RECORD`.
+4. Execute W1–W4 once with statistics disabled as the compilation/warm-up pass.
+5. Enable `SET STATISTICS IO ON` and `SET STATISTICS TIME ON`, keep `STATISTICS XML/PROFILE` off, and execute W1–W4 once with the fixed parameters in Section 2.
+6. Disable IO/TIME, enable `SET STATISTICS PROFILE ON`, and execute the same workloads once to capture actual-row plans separately.
+7. Apply exactly the four indexes in Section 5, warm once, and repeat Steps 5–6 with unchanged parameters.
+8. Compare the ordered result-only output before comparing IO, time, or operators. This run used an exact file comparison and SHA-256 equality.
 
-W2–W4 are the procedures in artifact 16. Resolve the W2 facility without guessing its identity value:
-
-```sql
-DECLARE @ConflictSpaceId INT=(SELECT space_id FROM dbo.SPACE WHERE unique_space_code=N'G03-GEN-S-050');
-SELECT b.booking_request_id,b.requested_start_time,b.requested_end_time
-FROM dbo.BOOKING_REQUEST b
-JOIN dbo.BOOKING_STATUS bs ON bs.booking_status_id=b.booking_status_id
-WHERE b.space_id=@ConflictSpaceId
-  AND bs.status_code IN(N'approved',N'checked_in')
-  AND b.requested_start_time<'2028-09-01T09:00:00'
-  AND b.requested_end_time>'2028-09-01T08:00:00';
-
-DECLARE @ProjectorId INT=(SELECT facility_id FROM dbo.FACILITY WHERE facility_name=N'G03-GEN-Projector');
-DECLARE @Facilities NVARCHAR(MAX)=CONCAT(N'[',@ProjectorId,N']');
-EXEC dbo.usp_G03_FindAvailableSpaces '2029-09-01T10:00:00','2029-09-01T11:00:00',30,@Facilities;
-EXEC dbo.usp_G03_ReportApprovedHoursBySpace '2027-09-01T00:00:00','2028-09-01T00:00:00';
-EXEC dbo.usp_G03_ReportApprovedBookingStartsByWeekdayHour '2027-09-01T00:00:00','2028-09-01T00:00:00';
-```
-
-This is classroom evidence from one SQL Server instance and one deterministic distribution. It does not claim production capacity or generalize beyond the measured parameters.
+This is one controlled warm measurement on one classroom SQL Server instance and one deterministic distribution. Millisecond timings can vary with the host, so logical reads and actual access-path changes are the more stable evidence. The report does not claim production capacity or generalize beyond the measured parameters.
